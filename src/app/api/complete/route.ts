@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 const MODEL = process.env.RABBIT_HOLE_MODEL ?? "claude-haiku-4-5";
 const MAX_PROMPT_CHARS = 40_000;
 
-const SYSTEM = `You are the editor of "Down the Rabbit Hole", a magazine that writes one feature page per topic for a curious reader who keeps falling deeper. Voice: vivid, concrete, witty, confident: a great magazine feature, never an encyclopedia entry. Use real names, places, dates and numbers, and stay accurate. Respond with ONLY one valid JSON object: no markdown fences, no commentary.`;
+const SYSTEM = `You are the editor of "claudescape", a magazine that writes one feature page per topic for a curious reader who keeps falling deeper. Voice: vivid, concrete, witty, confident: a great magazine feature, never an encyclopedia entry. Use real names, places, dates and numbers, and stay accurate. Respond with ONLY one valid JSON object: no markdown fences, no commentary.`;
 
 const client = new Anthropic();
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
     const message = e instanceof Error ? e.message : String(e);
     if (/authentication method/i.test(message)) {
-      return Response.json({ error: "No ANTHROPIC_API_KEY set — add it to nextjs/.env.local and restart the dev server." }, { status: 500 });
+      return Response.json({ error: "No ANTHROPIC_API_KEY set — add it to .env.local and restart the dev server." }, { status: 500 });
     }
     return Response.json({ error: message }, { status: 500 });
   }

@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, JetBrains_Mono, Newsreader } from "next/font/google";
+import { Geist, Instrument_Serif, JetBrains_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
+
+const geist = Geist({
+  variable: "--font-geist",
+  subsets: ["latin"],
+});
 
 const instrumentSerif = Instrument_Serif({
   variable: "--font-instrument",
@@ -23,15 +28,15 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Down the Rabbit Hole",
-  description: "Type a curiosity and fall. Every page ends in two doors.",
+  title: "claudescape · Start your rabbit hole",
+  description: "Ask Claude anything and fall. Every page ends in two doors.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${instrumentSerif.variable} ${jetbrainsMono.variable} ${newsreader.variable}`}
+      className={`${geist.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} ${newsreader.variable}`}
     >
       <body>{children}</body>
     </html>
