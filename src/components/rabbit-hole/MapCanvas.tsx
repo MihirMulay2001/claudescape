@@ -203,7 +203,7 @@ export default function MapCanvas({ width, height, focus, ink, muted, rule, bg, 
         <button className="rh-hbg" style={{ ...btn, ["--h-bg" as string]: rule }} onClick={() => go(fitView(), true)}>Fit</button>
         <button className="rh-hbg" style={{ ...btn, ["--h-bg" as string]: rule }} onClick={() => go(focusView(Math.max(viewRef.current.k, 0.9)), true)}>You</button>
       </div>
-      <div data-canvas-ui style={css`position:absolute; left:16px; bottom:18px; font-family:${MONO}; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:${muted}; pointer-events:none`}>
+      <div data-canvas-ui className="rh-map-hint" style={css`position:absolute; left:16px; bottom:18px; font-family:${MONO}; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:${muted}; pointer-events:none`}>
         Drag to pan · pinch or ⌘-scroll to zoom · click a page to open it
       </div>
     </div>

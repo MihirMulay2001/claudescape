@@ -606,33 +606,33 @@ export default class RabbitHole extends React.Component<Props, State> {
     switch (b.type) {
       case "figure":
         return (
-          <div style={css`display:grid; grid-template-columns:auto minmax(0,1fr); gap:44px; align-items:end; margin:16px 0 56px; padding:48px 0; border-top:1px solid ${t.rule}; border-bottom:1px solid ${t.rule}`}>
-            <div style={css`font-family:${SERIF}; font-size:clamp(120px,15vw,240px); line-height:.8; letter-spacing:-.03em; color:${t.accent}`}>{b.value}</div>
-            <div style={css`max-width:440px; padding-bottom:14px; font-family:${NEWS}; font-size:26px; line-height:1.3; text-wrap:pretty`}>{b.label}</div>
+          <div className="rh-figure" style={css`display:grid; grid-template-columns:auto minmax(0,1fr); gap:44px; align-items:end; margin:16px 0 56px; padding:48px 0; border-top:1px solid ${t.rule}; border-bottom:1px solid ${t.rule}`}>
+            <div className="rh-figure-v" style={css`font-family:${SERIF}; font-size:clamp(120px,15vw,240px); line-height:.8; letter-spacing:-.03em; color:${t.accent}`}>{b.value}</div>
+            <div className="rh-figure-l" style={css`max-width:440px; padding-bottom:14px; font-family:${NEWS}; font-size:26px; line-height:1.3; text-wrap:pretty`}>{b.label}</div>
           </div>
         );
       case "intro":
         return (
-          <p style={css`margin:0 0 56px; font-family:${NEWS}; font-size:24px; line-height:1.55; text-wrap:pretty`}>
-            <span style={css`float:left; padding:10px 14px 0 0; font-family:${SERIF}; font-size:122px; line-height:.76; color:${t.accent}`}>{b.cap}</span>
+          <p className="rh-intro" style={css`margin:0 0 56px; font-family:${NEWS}; font-size:24px; line-height:1.55; text-wrap:pretty`}>
+            <span className="rh-dropcap" style={css`float:left; padding:10px 14px 0 0; font-family:${SERIF}; font-size:122px; line-height:.76; color:${t.accent}`}>{b.cap}</span>
             {lk(b.rest)}
           </p>
         );
       case "section":
         return (
           <div style={css`padding:24px 0 36px`}>
-            <h2 style={css`margin:0 0 22px; font-family:${SERIF}; font-weight:400; font-size:50px; line-height:1; letter-spacing:-.01em; text-wrap:balance`}>{b.heading}</h2>
+            <h2 className="rh-h2" style={css`margin:0 0 22px; font-family:${SERIF}; font-weight:400; font-size:50px; line-height:1; letter-spacing:-.01em; text-wrap:balance`}>{b.heading}</h2>
             {b.paras.map((p, i) => (
-              <p key={i} style={css`margin:0 0 20px; font-family:${NEWS}; font-size:20px; line-height:1.62; text-wrap:pretty`}>{lk(p)}</p>
+              <p key={i} className="rh-p" style={css`margin:0 0 20px; font-family:${NEWS}; font-size:20px; line-height:1.62; text-wrap:pretty`}>{lk(p)}</p>
             ))}
           </div>
         );
       case "quote":
         return (
-          <figure style={css`margin:0; padding:64px 0 80px; display:grid; grid-template-columns:120px minmax(0,1fr); gap:24px`}>
-            <div style={css`font-family:${SERIF}; font-size:220px; line-height:.72; color:${t.accent}`}>“</div>
+          <figure className="rh-quote" style={css`margin:0; padding:64px 0 80px; display:grid; grid-template-columns:120px minmax(0,1fr); gap:24px`}>
+            <div className="rh-quote-mark" style={css`font-family:${SERIF}; font-size:220px; line-height:.72; color:${t.accent}`}>“</div>
             <div>
-              <blockquote style={css`margin:0; font-family:${SERIF}; font-style:italic; font-size:clamp(40px,4.8vw,72px); line-height:1.04; letter-spacing:-.01em; text-wrap:balance`}>{b.text}</blockquote>
+              <blockquote className="rh-quote-text" style={css`margin:0; font-family:${SERIF}; font-style:italic; font-size:clamp(40px,4.8vw,72px); line-height:1.04; letter-spacing:-.01em; text-wrap:balance`}>{b.text}</blockquote>
               <figcaption style={css`margin-top:26px; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}`}>— {b.cite}</figcaption>
             </div>
           </figure>
@@ -640,19 +640,19 @@ export default class RabbitHole extends React.Component<Props, State> {
       case "event": {
         const text = (right: boolean) => (
           <>
-            <div style={css`font-family:${SERIF}; font-size:34px; line-height:1.05; text-wrap:balance`}>{b.title}</div>
+            <div className="rh-ev-title" style={css`font-family:${SERIF}; font-size:34px; line-height:1.05; text-wrap:balance`}>{b.title}</div>
             <p style={css`margin:${right ? "12px 0 0 auto" : "12px 0 0"}; max-width:460px; font-family:${NEWS}; font-size:18px; line-height:1.55; color:${t.muted}; text-wrap:pretty`}>{lk(b.body)}</p>
           </>
         );
         const year = <div style={css`font-family:${SERIF}; font-size:clamp(64px,7vw,112px); line-height:.84; color:${t.accent}`}>{b.year}</div>;
         return (
-          <div style={css`display:grid; grid-template-columns:minmax(0,1fr) 80px minmax(0,1fr)`}>
-            <div style={css`padding:34px 0; text-align:right`}>{b.flip ? text(true) : year}</div>
-            <div style={css`position:relative; display:flex; justify-content:center`}>
+          <div className="rh-ev" style={css`display:grid; grid-template-columns:minmax(0,1fr) 80px minmax(0,1fr)`}>
+            <div className={b.flip ? "rh-ev-t" : "rh-ev-y"} style={css`padding:34px 0; text-align:right`}>{b.flip ? text(true) : year}</div>
+            <div className="rh-ev-line" style={css`position:relative; display:flex; justify-content:center`}>
               <div style={css`width:1px; height:100%; background:${t.muted}; opacity:.4`} />
               <div style={css`position:absolute; top:52px; width:13px; height:13px; border-radius:50%; background:${t.accent}; box-shadow:0 0 0 7px ${t.bg}`} />
             </div>
-            <div style={css`padding:34px 0; text-align:left`}>{b.flip ? year : text(false)}</div>
+            <div className={b.flip ? "rh-ev-y" : "rh-ev-t"} style={css`padding:34px 0; text-align:left`}>{b.flip ? year : text(false)}</div>
           </div>
         );
       }
@@ -660,15 +660,15 @@ export default class RabbitHole extends React.Component<Props, State> {
         const side = (label: string, c: Contender) => (
           <div>
             <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:${t.muted}`}>{label}</div>
-            <h3 style={css`margin:12px 0 10px; font-family:${SERIF}; font-weight:400; font-size:64px; line-height:.95; text-wrap:balance`}>{c.name}</h3>
+            <h3 className="rh-vs-name" style={css`margin:12px 0 10px; font-family:${SERIF}; font-weight:400; font-size:64px; line-height:.95; text-wrap:balance`}>{c.name}</h3>
             <div style={css`font-family:${SERIF}; font-style:italic; font-size:24px; color:${t.accent}`}>{c.tagline}</div>
             <p style={css`margin:18px 0 0; font-family:${NEWS}; font-size:19px; line-height:1.58; text-wrap:pretty`}>{lk(c.body)}</p>
           </div>
         );
         return (
-          <div style={css`display:grid; grid-template-columns:minmax(0,1fr) 104px minmax(0,1fr); gap:36px; align-items:start; padding:32px 0 56px`}>
+          <div className="rh-vs" style={css`display:grid; grid-template-columns:minmax(0,1fr) 104px minmax(0,1fr); gap:36px; align-items:start; padding:32px 0 56px`}>
             {side("Contender A", b.a)}
-            <div style={css`align-self:center; width:104px; height:104px; border-radius:50%; border:1px solid ${t.ink}; display:flex; align-items:center; justify-content:center; font-family:${SERIF}; font-style:italic; font-size:42px`}>vs</div>
+            <div className="rh-vs-mid" style={css`align-self:center; width:104px; height:104px; border-radius:50%; border:1px solid ${t.ink}; display:flex; align-items:center; justify-content:center; font-family:${SERIF}; font-style:italic; font-size:42px`}>vs</div>
             {side("Contender B", b.b)}
           </div>
         );
@@ -677,10 +677,10 @@ export default class RabbitHole extends React.Component<Props, State> {
         return (
           <div style={css`margin-bottom:56px; border-top:1px solid ${t.ink}`}>
             {b.rows.map((r, i) => (
-              <div key={i} style={css`display:grid; grid-template-columns:minmax(0,1fr) 240px minmax(0,1fr); align-items:baseline; padding:22px 0; border-bottom:1px solid ${t.rule}`}>
-                <div style={css`text-align:right; font-family:${SERIF}; font-size:38px; line-height:1.05`}>{r.a}</div>
-                <div style={css`text-align:center; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}`}>{r.label}</div>
-                <div style={css`font-family:${SERIF}; font-size:38px; line-height:1.05`}>{r.b}</div>
+              <div key={i} className="rh-row" style={css`display:grid; grid-template-columns:minmax(0,1fr) 240px minmax(0,1fr); align-items:baseline; padding:22px 0; border-bottom:1px solid ${t.rule}`}>
+                <div className="rh-row-a" style={css`text-align:right; font-family:${SERIF}; font-size:38px; line-height:1.05`}>{r.a}</div>
+                <div className="rh-row-label" style={css`text-align:center; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}`}>{r.label}</div>
+                <div className="rh-row-b" style={css`font-family:${SERIF}; font-size:38px; line-height:1.05`}>{r.b}</div>
               </div>
             ))}
           </div>
@@ -689,20 +689,20 @@ export default class RabbitHole extends React.Component<Props, State> {
         return (
           <div style={css`padding:16px 0 40px`}>
             <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:${t.accent}`}>The verdict</div>
-            <p style={css`margin:14px 0 0; font-family:${SERIF}; font-style:italic; font-size:34px; line-height:1.2; text-wrap:pretty`}>{lk(b.text)}</p>
+            <p className="rh-verdict" style={css`margin:14px 0 0; font-family:${SERIF}; font-style:italic; font-size:34px; line-height:1.2; text-wrap:pretty`}>{lk(b.text)}</p>
           </div>
         );
       case "plate":
         return (
           <div style={css`padding:16px 0`}>
-            <div style={css`min-height:${b.minH}; padding:36px; border-radius:6px; background:${b.tone}; display:flex; flex-direction:column; justify-content:space-between; gap:40px`}>
+            <div className="rh-plate" style={css`min-height:${b.minH}; padding:36px; border-radius:6px; background:${b.tone}; display:flex; flex-direction:column; justify-content:space-between; gap:40px`}>
               <div style={css`display:flex; justify-content:space-between; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase`}>
                 <span>Plate {b.num}</span>
                 <span>{b.year}</span>
               </div>
               <div>
                 <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.16em; text-transform:uppercase; opacity:.75`}>{b.tag}</div>
-                <h3 style={css`margin:12px 0 18px; font-family:${SERIF}; font-weight:400; font-size:${b.nameSize}; line-height:.95; letter-spacing:-.015em; text-wrap:balance`}>{b.name}</h3>
+                <h3 className="rh-plate-name" style={css`margin:12px 0 18px; font-family:${SERIF}; font-weight:400; font-size:${b.nameSize}; line-height:.95; letter-spacing:-.015em; text-wrap:balance`}>{b.name}</h3>
                 <p style={css`margin:0; max-width:620px; font-family:${NEWS}; font-size:18px; line-height:1.5; text-wrap:pretty`}>{lk(b.body)}</p>
               </div>
             </div>
@@ -710,7 +710,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         );
       case "closing":
         return (
-          <p style={css`margin:0; padding:48px 0 140px; font-family:${NEWS}; font-size:22px; line-height:1.6; text-wrap:pretty`}>
+          <p className="rh-closing" style={css`margin:0; padding:48px 0 140px; font-family:${NEWS}; font-size:22px; line-height:1.6; text-wrap:pretty`}>
             {lk(b.text)} <span style={css`color:${t.accent}`}>■</span>
           </p>
         );
@@ -803,13 +803,13 @@ export default class RabbitHole extends React.Component<Props, State> {
       <div style={css`min-height:100vh; background:${rootBg}; color:${t.ink}; transition:background 900ms ease, color 900ms ease`}>
         {s.screen === "landing" && (
           <main style={css`position:relative; min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; grid-template-columns:minmax(0,1fr); overflow:hidden; background:oklch(0.965 0.012 85); color:oklch(0.2 0.02 60)`}>
-            <div style={css`display:flex; justify-content:space-between; align-items:center; padding:28px 40px; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:oklch(0.45 0.02 60); opacity:${landOp}; transition:opacity 400ms ease`}>
+            <div className="rh-land-top" style={css`display:flex; justify-content:space-between; align-items:center; padding:28px 40px; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:oklch(0.45 0.02 60); opacity:${landOp}; transition:opacity 400ms ease`}>
               <span style={css`font-family:${SERIF}; font-style:italic; font-size:24px; letter-spacing:0; text-transform:none; color:oklch(0.2 0.02 60)`}>Down the Rabbit Hole</span>
-              <span>Every page ends in two doors</span>
+              <span className="rh-land-tag">Every page ends in two doors</span>
             </div>
-            <div style={css`display:flex; flex-direction:column; align-items:center; justify-content:center; gap:44px; padding:40px 40px 0; text-align:center; opacity:${landOp}; transform:${s.falling ? "translateY(-30px)" : "none"}; transition:opacity 500ms ease, transform 700ms ease`}>
+            <div className="rh-land-hero" style={css`display:flex; flex-direction:column; align-items:center; justify-content:center; gap:44px; padding:40px 40px 0; text-align:center; opacity:${landOp}; transform:${s.falling ? "translateY(-30px)" : "none"}; transition:opacity 500ms ease, transform 700ms ease`}>
               <h1 style={css`margin:0; max-width:1040px; font-family:${SERIF}; font-weight:400; font-size:clamp(56px,7.6vw,124px); line-height:.94; letter-spacing:-.02em; text-wrap:balance`}>What are you curious about?</h1>
-              <div style={css`display:flex; align-items:flex-end; gap:20px; width:min(760px,100%); padding-bottom:12px; border-bottom:1.5px solid oklch(0.2 0.02 60)`}>
+              <div className="rh-land-form" style={css`display:flex; align-items:flex-end; gap:20px; width:min(760px,100%); padding-bottom:12px; border-bottom:1.5px solid oklch(0.2 0.02 60)`}>
                 <input
                   ref={this.inputRef}
                   value={s.query}
@@ -817,11 +817,12 @@ export default class RabbitHole extends React.Component<Props, State> {
                   onKeyDown={(e) => { if (e.key === "Enter") this.start(s.query); }}
                   placeholder="sports cars"
                   aria-label="What are you curious about?"
+                  className="rh-land-input"
                   style={css`flex:1; min-width:0; border:0; outline:0; background:transparent; padding:0; font-family:${SERIF}; font-style:italic; font-size:46px; line-height:1.1; color:oklch(0.2 0.02 60)`}
                 />
                 <button
                   onClick={() => this.start(s.query || "sports cars")}
-                  className={btnInk.className}
+                  className={`${btnInk.className} rh-land-btn`}
                   style={{ ...css`flex:none; border:0; border-radius:999px; padding:14px 24px; background:oklch(0.2 0.02 60); color:oklch(0.965 0.012 85); font-family:${MONO}; font-size:13px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer`, ...btnInk.vars }}
                 >
                   Fall in ↓
@@ -835,9 +836,9 @@ export default class RabbitHole extends React.Component<Props, State> {
 
         {s.screen === "journey" && (
           <>
-            <div style={css`position:fixed; top:0; left:0; right:0; z-index:30; height:64px; display:flex; align-items:center; gap:24px; padding:0 28px 0 32px; background:color-mix(in oklch, ${t.bg} 86%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid ${t.rule}; transition:background 900ms ease`}>
-              <button onClick={() => this.goHome()} style={css`flex:none; border:0; background:transparent; padding:0; cursor:pointer; font-family:${SERIF}; font-style:italic; font-size:22px; color:${t.ink}`}>Down the Rabbit Hole</button>
-              <div style={css`flex:1; min-width:0; display:flex; justify-content:center; align-items:center; gap:10px; overflow:hidden; white-space:nowrap; font-family:${MONO}; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:${t.muted}`}>
+            <div className="rh-bar" style={css`position:fixed; top:0; left:0; right:0; z-index:30; height:64px; display:flex; align-items:center; gap:24px; padding:0 28px 0 32px; background:color-mix(in oklch, ${t.bg} 86%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid ${t.rule}; transition:background 900ms ease`}>
+              <button onClick={() => this.goHome()} className="rh-bar-home" style={css`flex:none; border:0; background:transparent; padding:0; cursor:pointer; font-family:${SERIF}; font-style:italic; font-size:22px; color:${t.ink}`}>Down the Rabbit Hole</button>
+              <div className="rh-crumbs" style={css`flex:1; min-width:0; display:flex; justify-content:center; align-items:center; gap:10px; overflow:hidden; white-space:nowrap; font-family:${MONO}; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:${t.muted}`}>
                 {crumbs.map((cr, i) => (
                   <span key={i} style={css`display:flex; gap:10px; color:${cr.c}; overflow:hidden; text-overflow:ellipsis`}>
                     <span style={css`opacity:${cr.arrowOp}`}>→</span>
@@ -863,7 +864,7 @@ export default class RabbitHole extends React.Component<Props, State> {
               </button>
             </div>
 
-            <div style={css`position:fixed; left:30px; top:50%; transform:translateY(-50%); z-index:30; display:flex; flex-direction:column; gap:12px; font-family:${MONO}; font-size:11px; color:${t.muted}`}>
+            <div className="rh-rail" style={css`position:fixed; left:30px; top:50%; transform:translateY(-50%); z-index:30; display:flex; flex-direction:column; gap:12px; font-family:${MONO}; font-size:11px; color:${t.muted}`}>
               {ticks.map((k) => (
                 <div key={k.label} style={css`display:flex; align-items:center; gap:10px; height:10px`}>
                   <div style={css`height:2px; width:${k.w}; background:${k.c}; transition:width 700ms ease, background 700ms ease`} />
@@ -878,19 +879,19 @@ export default class RabbitHole extends React.Component<Props, State> {
             <div style={css`position:fixed; left:0; right:0; bottom:0; height:60vh; z-index:0; pointer-events:none; background:linear-gradient(to top, ${tn.bg}, transparent); opacity:${sinkOp}`} />
 
             <div style={css`position:relative; z-index:1; transform-origin:50% 30vh; transform:${falling ? "scale(.9) translateY(-40px)" : "none"}; filter:${falling ? "blur(8px)" : "blur(0px)"}; opacity:${falling ? 0.35 : 1}; transition:transform 800ms cubic-bezier(.6,0,.2,1), filter 800ms ease, opacity 800ms ease`}>
-              <header style={css`max-width:1280px; margin:0 auto; padding:160px 96px 48px; display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:32px`}>
+              <header className="rh-head rh-grid" style={css`max-width:1280px; margin:0 auto; padding:160px 96px 48px; display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:32px`}>
                 <div style={css`grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:14px; padding-bottom:18px; border-bottom:1px solid ${t.ink}; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}`}>
                   <span style={css`color:${t.ink}`}>Level {levelStr}</span>
-                  <span>·</span>
+                  <span className="rh-meta-sep">·</span>
                   <span>{c?.via ? `${VIA[c.via]} ${c.term ? `“${c.term}” ` : ""}from “${c.fromTitle || ""}”` : "Where you started"}</span>
-                  <span style={css`margin-left:auto`}>{page?.layout ? `Format · ${cap(page.layout)}` : "Format · choosing"}</span>
+                  <span className="rh-meta-fmt" style={css`margin-left:auto`}>{page?.layout ? `Format · ${cap(page.layout)}` : "Format · choosing"}</span>
                 </div>
                 <div style={css`grid-column:1 / -1; margin-top:44px; font-family:${MONO}; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:${t.accent}; min-height:16px`}>{page?.kicker || ""}</div>
-                <h1 style={css`grid-column:1 / span 11; margin:18px 0 0; font-family:${SERIF}; font-weight:400; font-size:clamp(60px,7.8vw,128px); line-height:.92; letter-spacing:-.022em; text-wrap:balance; opacity:${page ? 1 : 0.35}; transition:opacity 600ms ease`}>
+                <h1 className="rh-title" style={css`grid-column:1 / span 11; margin:18px 0 0; font-family:${SERIF}; font-weight:400; font-size:clamp(60px,7.8vw,128px); line-height:.92; letter-spacing:-.022em; text-wrap:balance; opacity:${page ? 1 : 0.35}; transition:opacity 600ms ease`}>
                   {page?.title || (c ? c.title || cap(c.topic) : "")}
                 </h1>
                 {page?.dek && (
-                  <p style={css`grid-column:1 / span 7; margin:36px 0 0; font-family:${NEWS}; font-size:27px; line-height:1.35; text-wrap:pretty; color:${t.ink}`}>{page.dek}</p>
+                  <p className="rh-dek" style={css`grid-column:1 / span 7; margin:36px 0 0; font-family:${NEWS}; font-size:27px; line-height:1.35; text-wrap:pretty; color:${t.ink}`}>{page.dek}</p>
                 )}
                 {depth === 0 && threads.length > 0 && (
                   <div style={css`grid-column:1 / -1; margin-top:32px; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}; animation:rh-pop 600ms ease`}>
@@ -899,7 +900,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                 )}
               </header>
 
-              <div style={css`max-width:1280px; margin:0 auto; padding:0 96px; display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:32px; row-gap:0`}>
+              <div className="rh-body rh-grid" style={css`max-width:1280px; margin:0 auto; padding:0 96px; display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:32px; row-gap:0`}>
                 {blockList.map((b, i) => {
                   const shown = i < s.revealed;
                   return (
@@ -911,7 +912,7 @@ export default class RabbitHole extends React.Component<Props, State> {
               </div>
 
               {c?.status === "loading" && (
-                <div style={css`max-width:1280px; margin:0 auto; padding:0 96px 200px`}>
+                <div className="rh-body" style={css`max-width:1280px; margin:0 auto; padding:0 96px 200px`}>
                   <div style={css`display:flex; align-items:center; gap:12px; font-family:${MONO}; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:${t.muted}`}>
                     <span style={css`color:${t.accent}`}>●</span>
                     {LOAD_MSGS[s.loadIdx % LOAD_MSGS.length] + "…"}
@@ -921,33 +922,33 @@ export default class RabbitHole extends React.Component<Props, State> {
               )}
 
               {c?.status === "error" && (
-                <div style={css`max-width:1280px; margin:0 auto; padding:40px 96px 200px; display:flex; flex-direction:column; align-items:flex-start; gap:20px`}>
-                  <p style={css`margin:0; font-family:${SERIF}; font-style:italic; font-size:40px`}>This page got lost on the way down.</p>
+                <div className="rh-body" style={css`max-width:1280px; margin:0 auto; padding:40px 96px 200px; display:flex; flex-direction:column; align-items:flex-start; gap:20px`}>
+                  <p className="rh-err" style={css`margin:0; font-family:${SERIF}; font-style:italic; font-size:40px`}>This page got lost on the way down.</p>
                   <p style={css`margin:0; font-family:${MONO}; font-size:12px; color:${t.muted}`}>{c.error || ""}</p>
                   <button onClick={() => this.retry()} style={css`border:1px solid ${t.ink}; border-radius:999px; padding:12px 22px; background:transparent; color:${t.ink}; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`}>Try again</button>
                 </div>
               )}
 
               {showFork && (
-                <section ref={this.forkRef} style={css`position:relative; min-height:100vh; padding:120px 64px 120px; background:linear-gradient(to bottom, ${t.bg} 0%, ${tn.bg} 78%)`}>
+                <section ref={this.forkRef} className="rh-fork" style={css`position:relative; min-height:100vh; padding:120px 64px 120px; background:linear-gradient(to bottom, ${t.bg} 0%, ${tn.bg} 78%)`}>
                   <div style={css`max-width:1000px; margin:0 auto; text-align:center`}>
                     <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:${t.muted}`}>Bottom of level {levelStr}</div>
-                    <h2 style={css`margin:18px 0 0; font-family:${SERIF}; font-weight:400; font-size:clamp(64px,7vw,116px); line-height:.92; letter-spacing:-.02em`}>The path splits.</h2>
+                    <h2 className="rh-fork-h" style={css`margin:18px 0 0; font-family:${SERIF}; font-weight:400; font-size:clamp(64px,7vw,116px); line-height:.92; letter-spacing:-.02em`}>The path splits.</h2>
                     <p style={css`margin:22px auto 0; max-width:520px; font-family:${NEWS}; font-size:21px; line-height:1.45; color:${t.muted}`}>
                       {revisiting
                         ? "You’ve been here before. Your door leads back into your path; the other one starts a new branch from this page and replaces what came after."
                         : "Two doors lead further down, and both pages are already written. Pick one."}
                     </p>
                   </div>
-                  <div style={css`max-width:1000px; margin:36px auto 0`}>{this.forkSvg(open, chosen || hv, t)}</div>
-                  <div style={css`max-width:1000px; margin:0 auto; display:flex; justify-content:center`}>
+                  <div className="rh-fork-svg" style={css`max-width:1000px; margin:36px auto 0`}>{this.forkSvg(open, chosen || hv, t)}</div>
+                  <div className="rh-doors" style={css`max-width:1000px; margin:0 auto; display:flex; justify-content:center`}>
                     <div
                       role="button"
                       tabIndex={0}
                       onClick={(e) => this.pick("deeper", e.currentTarget.getBoundingClientRect())}
                       onMouseEnter={() => !s.trans && this.setState({ hover: "deeper" })}
                       onMouseLeave={() => !s.trans && this.setState({ hover: null })}
-                      style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 70% 55% at 50% 30%, oklch(0.07 0.02 285) 0%, oklch(0.16 0.035 290) 55%, oklch(0.23 0.05 305) 100%); color:oklch(0.95 0.015 70); box-shadow:${doorSh("deeper")}; transform:${doorTf("deeper", 1)}; opacity:${doorOp("deeper")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
+                      className="rh-door" style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 70% 55% at 50% 30%, oklch(0.07 0.02 285) 0%, oklch(0.16 0.035 290) 55%, oklch(0.23 0.05 305) 100%); color:oklch(0.95 0.015 70); box-shadow:${doorSh("deeper")}; transform:${doorTf("deeper", 1)}; opacity:${doorOp("deeper")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
                     >
                       <div style={css`position:absolute; inset:16px; border-radius:999px 999px 10px 10px; border:1px solid oklch(1 0 0 / 0.16)`} />
                       <div style={css`position:absolute; inset:50px 46px 130px 46px; border-radius:999px 999px 8px 8px; border:1px solid oklch(1 0 0 / 0.11)`} />
@@ -957,7 +958,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                         <div style={css`margin-top:8px; font-family:${SERIF}; font-style:italic; font-size:22px; color:oklch(0.8 0.03 290)`}>Harder. Higher stakes.</div>
                       </div>
                       <div style={css`position:absolute; left:40px; right:40px; bottom:34px; display:flex; flex-direction:column; gap:14px`}>
-                        <div style={css`font-family:${SERIF}; font-size:38px; line-height:1.02; text-wrap:balance`}>{fk.d?.title}</div>
+                        <div className="rh-door-title" style={css`font-family:${SERIF}; font-size:38px; line-height:1.02; text-wrap:balance`}>{fk.d?.title}</div>
                         <div style={css`font-family:${NEWS}; font-size:17px; line-height:1.4; color:oklch(0.82 0.03 290); text-wrap:pretty`}>{fk.d?.teaser}</div>
                         <div style={css`display:flex; justify-content:space-between; padding-top:14px; border-top:1px solid oklch(1 0 0 / 0.18); font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase`}>
                           <span>{revisiting && c?.chosen === "deeper" ? "Your path" : "Open this door"}</span>
@@ -965,14 +966,14 @@ export default class RabbitHole extends React.Component<Props, State> {
                         </div>
                       </div>
                     </div>
-                    <div style={css`flex:none; width:160px; display:flex; align-items:center; justify-content:center; font-family:${SERIF}; font-style:italic; font-size:30px; color:${t.muted}; opacity:${fk.orOp}; transition:opacity 800ms ease 400ms`}>or</div>
+                    <div className="rh-or" style={css`flex:none; width:160px; display:flex; align-items:center; justify-content:center; font-family:${SERIF}; font-style:italic; font-size:30px; color:${t.muted}; opacity:${fk.orOp}; transition:opacity 800ms ease 400ms`}>or</div>
                     <div
                       role="button"
                       tabIndex={0}
                       onClick={(e) => this.pick("sideways", e.currentTarget.getBoundingClientRect())}
                       onMouseEnter={() => !s.trans && this.setState({ hover: "sideways" })}
                       onMouseLeave={() => !s.trans && this.setState({ hover: null })}
-                      style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 80% 60% at 72% 28%, oklch(0.9 0.08 75) 0%, oklch(0.79 0.12 58) 58%, oklch(0.71 0.13 45) 100%); color:oklch(0.2 0.04 40); box-shadow:${doorSh("sideways")}; transform:${doorTf("sideways", -1)}; opacity:${doorOp("sideways")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
+                      className="rh-door" style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 80% 60% at 72% 28%, oklch(0.9 0.08 75) 0%, oklch(0.79 0.12 58) 58%, oklch(0.71 0.13 45) 100%); color:oklch(0.2 0.04 40); box-shadow:${doorSh("sideways")}; transform:${doorTf("sideways", -1)}; opacity:${doorOp("sideways")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
                     >
                       <div style={css`position:absolute; inset:16px; border-radius:999px 999px 10px 10px; border:1px solid oklch(0.2 0.04 40 / 0.22)`} />
                       <div style={css`position:absolute; inset:50px 16px 130px 90px; border-radius:999px 999px 8px 8px; border:1px solid oklch(0.2 0.04 40 / 0.16)`} />
@@ -982,7 +983,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                         <div style={css`margin-top:8px; font-family:${SERIF}; font-style:italic; font-size:22px; color:oklch(0.34 0.05 40)`}>Stranger. Off the map.</div>
                       </div>
                       <div style={css`position:absolute; left:40px; right:40px; bottom:34px; display:flex; flex-direction:column; gap:14px`}>
-                        <div style={css`font-family:${SERIF}; font-size:38px; line-height:1.02; text-wrap:balance`}>{fk.s?.title}</div>
+                        <div className="rh-door-title" style={css`font-family:${SERIF}; font-size:38px; line-height:1.02; text-wrap:balance`}>{fk.s?.title}</div>
                         <div style={css`font-family:${NEWS}; font-size:17px; line-height:1.4; color:oklch(0.3 0.05 40); text-wrap:pretty`}>{fk.s?.teaser}</div>
                         <div style={css`display:flex; justify-content:space-between; padding-top:14px; border-top:1px solid oklch(0.2 0.04 40 / 0.22); font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase`}>
                           <span>{revisiting && c?.chosen === "sideways" ? "Your path" : "Open this door"}</span>
@@ -1014,10 +1015,10 @@ export default class RabbitHole extends React.Component<Props, State> {
         {tr && (
           <div style={css`position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:${tr.bg}; color:${tr.ink}; clip-path:${tr.clip}; opacity:${tr.op}; pointer-events:${tr.pe}; transition:clip-path 780ms cubic-bezier(.76,0,.24,1), background 780ms ease, opacity 600ms ease`}>
             {this.streaks(tr.ink)}
-            <div style={css`position:relative; max-width:960px; padding:0 48px; text-align:center; opacity:${tr.innerOp}; transform:${tr.innerTf}; transition:opacity 500ms ease, transform 800ms cubic-bezier(.2,.8,.2,1)`}>
+            <div className="rh-tr" style={css`position:relative; max-width:960px; padding:0 48px; text-align:center; opacity:${tr.innerOp}; transform:${tr.innerTf}; transition:opacity 500ms ease, transform 800ms cubic-bezier(.2,.8,.2,1)`}>
               <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.24em; text-transform:uppercase; color:${tr.muted}`}>{tr.label}</div>
-              <div style={css`margin:10px 0 4px; font-family:${SERIF}; font-size:220px; line-height:.9; letter-spacing:-.03em; color:${tr.accent}`}>{tr.num}</div>
-              <div style={css`font-family:${SERIF}; font-size:56px; line-height:1; text-wrap:balance`}>{tr.title}</div>
+              <div className="rh-tr-num" style={css`margin:10px 0 4px; font-family:${SERIF}; font-size:220px; line-height:.9; letter-spacing:-.03em; color:${tr.accent}`}>{tr.num}</div>
+              <div className="rh-tr-title" style={css`font-family:${SERIF}; font-size:56px; line-height:1; text-wrap:balance`}>{tr.title}</div>
               {tr.waiting && (
                 <div style={css`margin-top:28px; font-family:${MONO}; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:${tr.muted}`}>Still writing the walls of this one…</div>
               )}
@@ -1027,22 +1028,22 @@ export default class RabbitHole extends React.Component<Props, State> {
 
         {mp && (
           <div style={css`position:fixed; inset:0; z-index:60; overflow:auto; background:${mp.bg}; color:${mp.ink}; opacity:${mp.op}; transition:opacity 500ms ease`}>
-            <div style={css`display:flex; justify-content:space-between; align-items:center; padding:24px 40px`}>
+            <div className="rh-map-top" style={css`display:flex; justify-content:space-between; align-items:center; padding:24px 40px`}>
               <span style={css`font-family:${SERIF}; font-style:italic; font-size:22px`}>Down the Rabbit Hole</span>
               <button onClick={() => this.setState({ map: null })} style={css`border:1px solid ${mp.rule}; border-radius:999px; padding:9px 16px; background:transparent; color:${mp.ink}; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`}>{mp.closeLabel}</button>
             </div>
-            <div style={css`max-width:1320px; margin:0 auto; padding:8px 40px 40px`}>
-              <div style={css`padding:56px 64px 48px; border-radius:10px; background:${mp.card}; border:1px solid ${mp.rule}`}>
+            <div className="rh-map-wrap" style={css`max-width:1320px; margin:0 auto; padding:8px 40px 40px`}>
+              <div className="rh-map-card" style={css`padding:56px 64px 48px; border-radius:10px; background:${mp.card}; border:1px solid ${mp.rule}`}>
                 <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:${mp.accent}`}>{mp.eyebrow}</div>
-                <h1 style={css`margin:18px 0 0; max-width:1080px; font-family:${SERIF}; font-weight:400; font-size:clamp(48px,5.6vw,92px); line-height:.98; letter-spacing:-.02em; text-wrap:balance`}>
+                <h1 className="rh-map-h" style={css`margin:18px 0 0; max-width:1080px; font-family:${SERIF}; font-weight:400; font-size:clamp(48px,5.6vw,92px); line-height:.98; letter-spacing:-.02em; text-wrap:balance`}>
                   {mp.finale && (<>You started at <em style={css`color:${mp.accent}`}>{mp.root}</em> and ended up at <em style={css`color:${mp.accent}`}>{mp.last}</em>.</>)}
                   {mp.midway && (<>You’re {mp.levels} levels below <em style={css`color:${mp.accent}`}>{mp.root}</em>, somewhere around <em style={css`color:${mp.accent}`}>{mp.last}</em>.</>)}
                   {mp.top && (<>You’re still at the surface of <em style={css`color:${mp.accent}`}>{mp.root}</em>. Two doors wait at the bottom of the page.</>)}
                 </h1>
-                <div style={css`margin-top:48px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:28px; border-top:1px solid ${mp.rule}; padding-top:36px`}>
+                <div className="rh-map-stats" style={css`margin-top:48px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:28px; border-top:1px solid ${mp.rule}; padding-top:36px`}>
                   {mp.stats.map((st) => (
                     <div key={st.l}>
-                      <div style={css`font-family:${SERIF}; font-size:64px; line-height:.9`}>{st.v}</div>
+                      <div className="rh-map-stat" style={css`font-family:${SERIF}; font-size:64px; line-height:.9`}>{st.v}</div>
                       <div style={css`margin-top:6px; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>{st.l}</div>
                     </div>
                   ))}
@@ -1069,12 +1070,12 @@ export default class RabbitHole extends React.Component<Props, State> {
                     ))}
                   </MapCanvas>
                 </div>
-                <div style={css`margin-top:40px; padding-top:20px; border-top:1px solid ${mp.rule}; display:flex; justify-content:space-between; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>
+                <div className="rh-map-foot" style={css`margin-top:40px; padding-top:20px; border-top:1px solid ${mp.rule}; display:flex; justify-content:space-between; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>
                   <span>Down the Rabbit Hole</span>
                   <span>{mp.footer}</span>
                 </div>
               </div>
-              <div style={css`display:flex; justify-content:center; gap:12px; padding:32px 0 24px`}>
+              <div className="rh-map-btns" style={css`display:flex; justify-content:center; gap:12px; padding:32px 0 24px`}>
                 <button
                   onClick={() => {
                     navigator.clipboard?.writeText(mp.shareText).catch(() => {});
