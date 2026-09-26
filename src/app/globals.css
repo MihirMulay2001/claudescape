@@ -83,3 +83,11 @@ input::placeholder {
   box-shadow: 0 40px 70px -30px oklch(0 0 0 / 0.55);
   outline: none;
 }
+
+/* Trapdoor card entrance. */
+@keyframes rh-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}

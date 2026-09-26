@@ -6,6 +6,13 @@ export interface Fork {
   title: string;
   teaser: string;
 }
+/** A trapdoor hidden in the page text: tapping `term` opens a card that falls into `topic`. */
+export interface Thread extends Fork {
+  term: string;
+}
+/** How the reader reached a page: through one of the two doors, or through a trapdoor in the text. */
+export type Via = Kind | "thread";
+export const VIA: Record<Via, string> = { deeper: "↓ Deeper", sideways: "→ Sideways", thread: "↘ Trapdoor" };
 export interface Contender {
   name: string;
   tagline: string;
@@ -32,6 +39,7 @@ export interface Page {
   gallery?: { items?: { name: string; year: string; tag: string; body: string }[] };
   closing?: string;
   forks?: Partial<Record<Kind, Fork>>;
+  threads?: Thread[];
   /** Web sources the page was grounded in (added client-side, not written by the model). */
   sources?: Source[];
 }
@@ -67,7 +75,7 @@ export const PAL: Theme[] = [
 export const pal = (d: number) => PAL[Math.max(0, Math.min(d, PAL.length - 1))];
 
 export const HUES = [30, 75, 140, 200, 262, 320];
-export const DOOR: Record<Kind, string> = { deeper: "oklch(0.16 0.035 290)", sideways: "oklch(0.79 0.12 58)" };
+export const DOOR: Record<Via, string> = { deeper: "oklch(0.16 0.035 290)", sideways: "oklch(0.79 0.12 58)", thread: "oklch(0.55 0.15 38)" };
 export const LOAD_MSGS = ["Pulling files from the archive", "Finding the strange parts", "Checking the dates", "Setting the type", "Building two doors"];
 export type Glyph = "car" | "jelly" | "lattice" | "slab" | "moon" | "record" | "army" | "crater" | "columns";
 export interface Example {
@@ -112,9 +120,11 @@ export const HEAD = `"layout": "story" | "timeline" | "comparison" | "gallery",
 "intro": "opening paragraph, 70-100 words, opening on a scene or a surprising fact"`;
 
 export const TAIL = `"closing": "final paragraph, 40-60 words, leaving a thread dangling",
-"forks": {"deeper": {"topic": "2-5 word lowercase noun phrase", "title": "hooky, specific door title, max 10 words", "teaser": "one line, max 18 words"}, "sideways": {same shape}}`;
+"forks": {"deeper": {"topic": "2-5 word lowercase noun phrase", "title": "hooky, specific door title, max 10 words", "teaser": "one line, max 18 words"}, "sideways": {same shape}},
+"threads": [exactly 4 items: {"term": "1-4 words copied EXACTLY, same spelling, from this page's paragraphs (not the title, headings or figure)", "topic": "2-5 word lowercase noun phrase", "title": "hooky page title, max 9 words", "teaser": "one line, max 16 words"}]`;
 
-export const FORK_RULES = `Forks are two doors at the bottom of the page. "deeper" goes into the more intense, extreme, high-stakes or technical side of THIS page (e.g. sports cars → "Inside the 5G forces of an F1 race"). "sideways" is a weird, delightful, surprising tangent linked by one unexpected thread (e.g. sports cars → "The whimsical car designs that never made it"). Both must be specific and irresistible, and must not revisit any topic already in the journey.`;
+export const FORK_RULES = `Forks are two doors at the bottom of the page. "deeper" goes into the more intense, extreme, high-stakes or technical side of THIS page (e.g. sports cars → "Inside the 5G forces of an F1 race"). "sideways" is a weird, delightful, surprising tangent linked by one unexpected thread (e.g. sports cars → "The whimsical car designs that never made it"). Both must be specific and irresistible, and must not revisit any topic already in the journey.
+Threads are trapdoors hidden in the text: the most intriguing names, phenomena, objects or places the page mentions in passing, each worth a page of its own. Spread them across the page, and make each topic distinct from the forks, from each other and from the journey so far.`;
 
 export const layoutRule = (prev?: string) =>
   `Choose the layout that best suits the content: story (a narrative, a person, an event), timeline (history, evolution), comparison (two rivals, eras or approaches), gallery (visual subjects: designs, creatures, objects, places).${prev ? ` Avoid "${prev}" (the previous page's layout) unless nothing else fits.` : ""}`;

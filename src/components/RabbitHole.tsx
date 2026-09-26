@@ -6,7 +6,7 @@ import MapCanvas from "./rabbit-hole/MapCanvas";
 import TopicStream from "./rabbit-hole/TopicStream";
 import {
   alpha, ask, cap, DOOR, FORK_RULES, grounding, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, research, sleep, SHAPES, TAIL,
-  type Contender, type Kind, type Page, type Source, type Theme,
+  VIA, type Contender, type Fork, type Kind, type Page, type Source, type Theme, type Thread, type Via,
 } from "./rabbit-hole/content";
 
 type Status = "loading" | "ready" | "error";
@@ -17,7 +17,9 @@ interface JourneyNode {
   title?: string;
   teaser?: string;
   depth: number;
-  via: Kind | null;
+  via: Via | null;
+  /** The phrase tapped to get here, when `via` is "thread". */
+  term?: string;
   fromTitle?: string;
   prevLayout?: string;
   status: Status;
@@ -31,7 +33,7 @@ interface Rect { top: number; left: number; right: number; bottom: number; width
 interface Trans {
   phase: "start" | "grow" | "out";
   rect: Rect;
-  kind: Kind;
+  kind: Via;
   title: string;
   depth: number;
   waiting: boolean;
@@ -54,6 +56,8 @@ interface State {
   ready: Record<string, "ready" | "error">;
   loadIdx: number;
   copied: boolean;
+  /** The trapdoor card open in the text: which thread, its horizontal offset from the term, and whether it opens upward. */
+  thread: { i: number; dx: number; up: boolean } | null;
 }
 
 interface Props {
@@ -117,9 +121,16 @@ function blocks(page: Page, depth: number): Block[] {
   return out;
 }
 
-function ctx(node: { via: Kind | null; topic: string; title?: string; teaser?: string }, path: string[]) {
+function ctx(node: { via: Via | null; topic: string; title?: string; teaser?: string; term?: string }, path: string[]) {
   if (!node.via) return `The reader typed: "${node.topic}". Write the first page of the journey.`;
+  if (node.via === "thread") return `Journey so far: ${path.join(" → ")}. The reader tapped the phrase "${node.term}" in the page and fell through it, into "${node.title}" ("${node.teaser}"). Write the page for: ${node.topic}. The headline may echo that title.`;
   return `Journey so far: ${path.join(" → ")}. The reader just chose the ${node.via.toUpperCase()} door titled "${node.title}" ("${node.teaser}"). Write the page for: ${node.topic}. The headline may echo the door title.`;
+}
+
+/** Case-insensitive match for a trapdoor term, on word boundaries where the term starts or ends with a letter or digit. */
+function termRe(term: string) {
+  const t = term.trim(), esc = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`${/^\w/.test(t) ? "\\b" : ""}${esc}${/\w$/.test(t) ? "\\b" : ""}`, "i");
 }
 
 const errMsg = (e: unknown) => String((e as Error)?.message || e);
@@ -127,7 +138,7 @@ const errMsg = (e: unknown) => String((e as Error)?.message || e);
 export default class RabbitHole extends React.Component<Props, State> {
   state: State = {
     screen: "landing", query: "", falling: false, nodes: [], at: 0, revealed: 0, forkOpen: false, hover: null,
-    trans: null, map: null, mapDrawn: false, scrollP: 0, ready: {}, loadIdx: 0, copied: false,
+    trans: null, map: null, mapDrawn: false, scrollP: 0, ready: {}, loadIdx: 0, copied: false, thread: null,
   };
   forkRef = React.createRef<HTMLElement>();
   inputRef = React.createRef<HTMLInputElement>();
@@ -137,10 +148,17 @@ export default class RabbitHole extends React.Component<Props, State> {
   loadT?: ReturnType<typeof setInterval>;
 
   onScroll = () => this.handleScroll();
+  /** Closes the trapdoor card on a click outside it or Escape. */
+  onDocDown = (e: Event) => {
+    if (!this.state.thread) return;
+    if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element).closest?.("[data-thread]")) this.setState({ thread: null });
+  };
 
   componentDidMount() {
     window.addEventListener("scroll", this.onScroll, { passive: true });
     window.addEventListener("resize", this.onScroll);
+    document.addEventListener("pointerdown", this.onDocDown);
+    document.addEventListener("keydown", this.onDocDown);
     this.revealT = setInterval(() => this.tickReveal(), 240);
     this.loadT = setInterval(() => {
       const c = this.cur();
@@ -150,6 +168,8 @@ export default class RabbitHole extends React.Component<Props, State> {
   componentWillUnmount() {
     window.removeEventListener("scroll", this.onScroll);
     window.removeEventListener("resize", this.onScroll);
+    document.removeEventListener("pointerdown", this.onDocDown);
+    document.removeEventListener("keydown", this.onDocDown);
     clearInterval(this.revealT);
     clearInterval(this.loadT);
   }
@@ -191,7 +211,7 @@ export default class RabbitHole extends React.Component<Props, State> {
       const head = await ask(`${ctx(node, path)}\n${grounding(notes)}${layoutRule(node.prevLayout)}\nReturn only the opening of the page as JSON with exactly these keys:\n{${HEAD}}`, 700);
       if (!SHAPES[head.layout]) head.layout = "story";
       this.updateNode(node.id, { page: head });
-      const body = await ask(`${ctx(node, path)}\n${grounding(notes)}You already wrote this opening: ${JSON.stringify(head)}\nNow write the rest of this ${head.layout} page. Return JSON with exactly these keys:\n{${SHAPES[head.layout]},\n${TAIL}}\n${FORK_RULES}`, 2600);
+      const body = await ask(`${ctx(node, path)}\n${grounding(notes)}You already wrote this opening: ${JSON.stringify(head)}\nNow write the rest of this ${head.layout} page. Return JSON with exactly these keys:\n{${SHAPES[head.layout]},\n${TAIL}}\n${FORK_RULES}`, 2900);
       const page = { ...head, ...body, layout: head.layout, sources: notes.sources };
       this.updateNode(node.id, { page, status: "ready" });
       this.prefetch({ ...node, page }, path);
@@ -199,27 +219,44 @@ export default class RabbitHole extends React.Component<Props, State> {
       this.updateNode(node.id, { status: "error", error: errMsg(e) });
     }
   }
+  /** Writes both door pages in the background while the reader is on `node`. */
   prefetch(node: JourneyNode, path: string[]) {
     (["deeper", "sideways"] as const).forEach((kind) => {
       const f = node.page?.forks?.[kind];
-      const key = node.id + ":" + kind;
-      if (!f || this.pre[key]) return;
-      const child = { topic: f.topic, title: f.title, teaser: f.teaser, via: kind };
-      // Runs in the background while the reader is on this page, so it can afford the Wikipedia scrape
-      // (capped at 12s; past that, fall back to the search snippets alone).
-      const promise = (async () => {
-        const notes = await research(f.topic, f.title, "deep", 12000, () => research(f.topic, f.title, "fast", 2500));
-        const prompt = `${ctx(child, [...path])}\n${grounding(notes)}${layoutRule(node.page?.layout)}\nReturn one JSON object with exactly these keys (include ONLY the one layout key matching your chosen layout):\n{${HEAD},\n<layout key>: one of:\n  ${Object.values(SHAPES).join("\n  ")},\n${TAIL}}\n${FORK_RULES}`;
-        const d = await ask(prompt, 3200);
-        if (!d.title || !d.forks) throw new Error("Incomplete page.");
-        if (!SHAPES[d.layout]) d.layout = LAYOUTS.find((k) => d[k]) || "story";
-        d.sources = notes.sources;
-        this.setState((s) => ({ ready: { ...s.ready, [key]: "ready" } }));
-        return d;
-      })();
-      promise.catch(() => this.setState((s) => ({ ready: { ...s.ready, [key]: "error" } })));
-      this.pre[key] = { promise };
+      if (f) this.prefetchOne(node, path, kind, f, kind, 12000);
     });
+  }
+  /**
+   * Writes the page behind one door or trapdoor, keyed by `slot` ("deeper", "sideways" or "t<i>").
+   * It can afford the Wikipedia scrape since the reader is still reading (capped at `budgetMs`; past that,
+   * fall back to the search snippets alone).
+   */
+  prefetchOne(node: JourneyNode, path: string[], via: Via, f: Fork, slot: string, budgetMs: number) {
+    const key = node.id + ":" + slot;
+    if (this.pre[key]) return;
+    const child = { topic: f.topic, title: f.title, teaser: f.teaser, via, term: (f as Thread).term };
+    const promise = (async () => {
+      const notes = await research(f.topic, f.title, "deep", budgetMs, () => research(f.topic, f.title, "fast", 2500));
+      const prompt = `${ctx(child, [...path])}\n${grounding(notes)}${layoutRule(node.page?.layout)}\nReturn one JSON object with exactly these keys (include ONLY the one layout key matching your chosen layout):\n{${HEAD},\n<layout key>: one of:\n  ${Object.values(SHAPES).join("\n  ")},\n${TAIL}}\n${FORK_RULES}`;
+      const d = await ask(prompt, 3500);
+      if (!d.title || !d.forks) throw new Error("Incomplete page.");
+      if (!SHAPES[d.layout]) d.layout = LAYOUTS.find((k) => d[k]) || "story";
+      d.sources = notes.sources;
+      this.setState((s) => ({ ready: { ...s.ready, [key]: "ready" } }));
+      return d;
+    })();
+    promise.catch(() => this.setState((s) => ({ ready: { ...s.ready, [key]: "error" } })));
+    this.pre[key] = { promise };
+  }
+  /** Opens the trapdoor card for thread i under its term, kept inside the viewport, and starts writing its page. */
+  openThread(i: number, r: DOMRect) {
+    const c = this.cur(), th = c?.page?.threads?.[i];
+    if (!c || !th) return;
+    if (this.state.thread?.i === i) return this.setState({ thread: null });
+    const W = Math.min(340, innerWidth - 32);
+    const left = Math.max(16, Math.min(r.left + r.width / 2 - W / 2, innerWidth - W - 16));
+    this.setState({ thread: { i, dx: left - r.left, up: r.bottom > innerHeight - 300 } });
+    this.prefetchOne(c, this.pathTo(this.state.at), "thread", th, "t" + i, 6000);
   }
 
   start(topic: string) {
@@ -229,7 +266,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     setTimeout(() => {
       const node: JourneyNode = { id: this.nid++, topic: topic.toLowerCase(), depth: 0, via: null, status: "loading", page: null };
       window.scrollTo(0, 0);
-      this.setState({ screen: "journey", falling: false, nodes: [node], at: 0, revealed: 0, forkOpen: false, hover: null, map: null, trans: null, scrollP: 0 });
+      this.setState({ screen: "journey", falling: false, nodes: [node], at: 0, revealed: 0, forkOpen: false, hover: null, map: null, trans: null, thread: null, scrollP: 0 });
       this.genSplit(node, [node.topic]);
     }, 1000);
   }
@@ -241,17 +278,26 @@ export default class RabbitHole extends React.Component<Props, State> {
     this.setState({ revealed: 0 });
     this.genSplit({ ...c }, path);
   }
-  async pick(kind: Kind, r: DOMRect) {
+  pick(kind: Kind, r: DOMRect) {
+    const f = this.cur()?.page?.forks?.[kind];
+    if (f) this.fall(kind, f, kind, r);
+  }
+  fallThread(i: number, r: DOMRect) {
+    const th = this.cur()?.page?.threads?.[i];
+    if (th) this.fall("thread", th, "t" + i, r);
+  }
+  /** Falls from the current page through a door or trapdoor (`slot` as in prefetchOne) into the next level. */
+  async fall(via: Via, f: Fork, slot: string, r: DOMRect) {
     if (this.state.trans) return;
     const c = this.cur(), at = this.state.at;
-    const f = c?.page?.forks?.[kind];
-    if (!c || !f) return;
-    const depth = c.depth + 1, key = c.id + ":" + kind;
+    if (!c) return;
+    const depth = c.depth + 1, key = c.id + ":" + slot;
     const path = this.pathTo(at);
-    // Revisiting a page and taking the same door again: walk back into the existing path.
+    const rect = { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width };
+    // Revisiting a page and taking the same way down again: walk back into the existing path.
     const next = this.state.nodes[at + 1];
-    if (next?.via === kind) {
-      this.setState({ trans: { phase: "start", rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width }, kind, title: f.title, depth, waiting: false } });
+    if (next?.via === via && (via !== "thread" || next.topic === f.topic)) {
+      this.setState({ thread: null, trans: { phase: "start", rect, kind: via, title: f.title, depth, waiting: false } });
       requestAnimationFrame(() => requestAnimationFrame(() => this.setState((s) => ({ trans: s.trans && { ...s.trans, phase: "grow" } }))));
       await sleep(950);
       window.scrollTo(0, 0);
@@ -259,10 +305,14 @@ export default class RabbitHole extends React.Component<Props, State> {
       setTimeout(() => this.setState({ trans: null }), 650);
       return;
     }
-    if (!this.pre[key]) this.prefetch(c, path);
+    if (!this.pre[key]) {
+      if (via === "thread") this.prefetchOne(c, path, via, f, slot, 6000);
+      else this.prefetch(c, path);
+    }
     this.setState((s) => ({
-      nodes: s.nodes.map((n) => (n.id === c.id ? { ...n, chosen: kind } : n)),
-      trans: { phase: "start", rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width }, kind, title: f.title, depth, waiting: false },
+      thread: null,
+      nodes: s.nodes.map((n) => (n.id === c.id ? { ...n, chosen: via === "thread" ? undefined : via } : n)),
+      trans: { phase: "start", rect, kind: via, title: f.title, depth, waiting: false },
     }));
     requestAnimationFrame(() => requestAnimationFrame(() => this.setState((s) => ({ trans: s.trans && { ...s.trans, phase: "grow" } }))));
     const t0 = Date.now();
@@ -277,7 +327,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     const el = Date.now() - t0;
     if (el < 950) await sleep(950 - el);
     const node: JourneyNode = {
-      id: this.nid++, topic: f.topic, title: f.title, teaser: f.teaser, depth, via: kind, fromTitle: c.page?.title,
+      id: this.nid++, topic: f.topic, title: f.title, teaser: f.teaser, depth, via, term: (f as Thread).term, fromTitle: c.page?.title,
       prevLayout: c.page?.layout, status: data ? "ready" : "error", page: data, error: err ? errMsg(err) : null,
     };
     window.scrollTo(0, 0);
@@ -292,7 +342,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     if (!n) return;
     const all = n.page ? blocks(n.page, n.depth).length : 0;
     if (!doors) window.scrollTo(0, 0);
-    this.setState({ map: null, at: i, revealed: all, forkOpen: !!doors, hover: doors ?? null, scrollP: 0 }, () => {
+    this.setState({ map: null, thread: null, at: i, revealed: all, forkOpen: !!doors, hover: doors ?? null, scrollP: 0 }, () => {
       if (doors) requestAnimationFrame(() => this.forkRef.current?.scrollIntoView({ block: "start" }));
     });
   }
@@ -302,7 +352,7 @@ export default class RabbitHole extends React.Component<Props, State> {
   }
   goHome() {
     window.scrollTo(0, 0);
-    this.setState({ screen: "landing", nodes: [], at: 0, query: "", map: null, trans: null, revealed: 0, forkOpen: false, falling: false });
+    this.setState({ screen: "landing", nodes: [], at: 0, query: "", map: null, trans: null, thread: null, revealed: 0, forkOpen: false, falling: false });
   }
 
   // ─── Pieces ──────────────────────────────────────────────────────────────
@@ -374,7 +424,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     const U = 270, R = 138, PX = 30, PY = 20, step = finale ? 0.55 : 0.3;
     let x = 0;
     const pos = ns.map((n, i) => {
-      if (i > 0) x += n.via === "sideways" ? 1 : -0.6;
+      if (i > 0) x += n.via === "sideways" ? 1 : n.via === "thread" ? -1.6 : -0.6;
       return x;
     });
     type Raw =
@@ -387,7 +437,8 @@ export default class RabbitHole extends React.Component<Props, State> {
       if (i > 0) edges.push({ a: [pos[i - 1], i - 1], b: [pos[i], i], chosen: true, delay: (i - 1) * step + 0.1 });
       const forks = n.page?.forks;
       if (!forks) return;
-      const kinds: Kind[] = i < ns.length - 1 ? [ns[i + 1].via === "deeper" ? "sideways" : "deeper"] : ["deeper", "sideways"];
+      const nv = ns[i + 1]?.via;
+      const kinds: Kind[] = nv === "deeper" ? ["sideways"] : nv === "sideways" ? ["deeper"] : ["deeper", "sideways"];
       kinds.forEach((k) => {
         const f = forks[k];
         if (!f) return;
@@ -403,7 +454,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     const drawn = s.mapDrawn;
     const items = raw.map((r) => {
       const vis = r.kind === "visited", isCur = vis && r.i === at;
-      const via = r.kind === "visited" ? r.n.via : r.k;
+      const via = r.kind === "visited" ? (r.n.via === "thread" ? "trapdoor" : r.n.via) : r.k;
       const here = isCur && at < ns.length - 1 ? " · you are here" : "";
       const meta = vis ? (r.i === 0 ? "Start" + here : `L${pad(r.i)} · ${via}${here}`) : `L${pad(r.i + 1)} · ${via} · ${r.kind === "ahead" ? "ahead" : "not taken"}`;
       // Visited → reopen that page. Ahead → take the door. Not taken → the page it branched from, at its doors.
@@ -460,7 +511,75 @@ export default class RabbitHole extends React.Component<Props, State> {
     };
   }
 
-  renderBlock(b: Block, t: Theme) {
+  /** Wraps the first mention on the page of each thread's term in a trapdoor. `used` spans one render of the page. */
+  linkify(text: string, threads: Thread[], used: Set<number>, t: Theme): React.ReactNode {
+    const out: React.ReactNode[] = [];
+    let rest = text;
+    for (;;) {
+      let best: { i: number; at: number; len: number } | null = null;
+      threads.forEach((th, i) => {
+        if (used.has(i)) return;
+        const m = termRe(th.term).exec(rest);
+        if (m && (!best || m.index < best.at)) best = { i, at: m.index, len: m[0].length };
+      });
+      if (!best) break;
+      const { i, at, len } = best as { i: number; at: number; len: number };
+      used.add(i);
+      out.push(rest.slice(0, at), this.trapdoor(i, rest.slice(at, at + len), threads[i], t));
+      rest = rest.slice(at + len);
+    }
+    out.push(rest);
+    return out.length === 1 ? text : out;
+  }
+  trapdoor(i: number, word: string, th: Thread, t: Theme) {
+    const s = this.state, c = this.cur(), card = s.thread?.i === i ? s.thread : null;
+    const rd = c ? s.ready[c.id + ":t" + i] : undefined;
+    const next = s.nodes[s.at + 1], taken = next?.via === "thread" && next.topic === th.topic;
+    return (
+      <span key={"t" + i} data-thread style={css`position:relative; white-space:nowrap`}>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-expanded={!!card}
+          onClick={(e) => this.openThread(i, e.currentTarget.getBoundingClientRect())}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.openThread(i, e.currentTarget.getBoundingClientRect()); } }}
+          className="rh-hbg"
+          style={{ ...css`cursor:pointer; border-radius:3px; text-decoration-line:underline; text-decoration-style:dotted; text-decoration-color:${t.accent}; text-decoration-thickness:2px; text-underline-offset:5px; background:${card ? t.soft : "transparent"}; transition:background 200ms`, ["--h-bg" as string]: t.soft }}
+        >
+          {word}
+          <sup style={css`margin-left:2px; font-family:${MONO}; font-size:.55em; color:${t.accent}`}>↓</sup>
+        </span>
+        {card && (
+          <span
+            role="dialog"
+            aria-label={th.title}
+            style={css`position:absolute; z-index:20; left:${card.dx}px; ${card.up ? "bottom" : "top"}:calc(100% + 12px); width:min(340px, calc(100vw - 32px)); display:block; padding:22px 22px 18px; border-radius:10px; background:${t.bg}; color:${t.ink}; border:1px solid ${t.rule}; box-shadow:0 30px 60px -24px oklch(0 0 0 / 0.45); white-space:normal; text-align:left; animation:rh-pop 260ms cubic-bezier(.2,.8,.2,1)`}
+          >
+            <span style={css`display:flex; justify-content:space-between; font-family:${MONO}; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:${t.accent}`}>
+              <span>Trapdoor · to level {pad((c?.depth ?? 0) + 1)}</span>
+              <button onClick={() => this.setState({ thread: null })} aria-label="Close" style={css`border:0; background:transparent; padding:0; color:${t.muted}; font:inherit; cursor:pointer`}>✕</button>
+            </span>
+            <span style={css`display:block; margin:12px 0 8px; font-family:${SERIF}; font-size:30px; line-height:1.02; text-wrap:balance`}>{th.title}</span>
+            <span style={css`display:block; font-family:${NEWS}; font-size:16px; line-height:1.4; color:${t.muted}; text-wrap:pretty`}>{th.teaser}</span>
+            <span style={css`display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; padding-top:14px; border-top:1px solid ${t.rule}`}>
+              <span style={css`font-family:${MONO}; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}`}>
+                {taken ? "Your path" : rd === "ready" ? "● Ready" : rd === "error" ? "○ Will write on entry" : "◌ Writing…"}
+              </span>
+              <button
+                onClick={(e) => this.fallThread(i, e.currentTarget.getBoundingClientRect())}
+                className="rh-hbg"
+                style={{ ...css`border:0; border-radius:999px; padding:10px 18px; background:${t.ink}; color:${t.bg}; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`, ["--h-bg" as string]: t.accent }}
+              >
+                Fall in ↓
+              </button>
+            </span>
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  renderBlock(b: Block, t: Theme, lk: (s: string) => React.ReactNode) {
     switch (b.type) {
       case "figure":
         return (
@@ -473,7 +592,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         return (
           <p style={css`margin:0 0 56px; font-family:${NEWS}; font-size:24px; line-height:1.55; text-wrap:pretty`}>
             <span style={css`float:left; padding:10px 14px 0 0; font-family:${SERIF}; font-size:122px; line-height:.76; color:${t.accent}`}>{b.cap}</span>
-            {b.rest}
+            {lk(b.rest)}
           </p>
         );
       case "section":
@@ -481,7 +600,7 @@ export default class RabbitHole extends React.Component<Props, State> {
           <div style={css`padding:24px 0 36px`}>
             <h2 style={css`margin:0 0 22px; font-family:${SERIF}; font-weight:400; font-size:50px; line-height:1; letter-spacing:-.01em; text-wrap:balance`}>{b.heading}</h2>
             {b.paras.map((p, i) => (
-              <p key={i} style={css`margin:0 0 20px; font-family:${NEWS}; font-size:20px; line-height:1.62; text-wrap:pretty`}>{p}</p>
+              <p key={i} style={css`margin:0 0 20px; font-family:${NEWS}; font-size:20px; line-height:1.62; text-wrap:pretty`}>{lk(p)}</p>
             ))}
           </div>
         );
@@ -499,7 +618,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         const text = (right: boolean) => (
           <>
             <div style={css`font-family:${SERIF}; font-size:34px; line-height:1.05; text-wrap:balance`}>{b.title}</div>
-            <p style={css`margin:${right ? "12px 0 0 auto" : "12px 0 0"}; max-width:460px; font-family:${NEWS}; font-size:18px; line-height:1.55; color:${t.muted}; text-wrap:pretty`}>{b.body}</p>
+            <p style={css`margin:${right ? "12px 0 0 auto" : "12px 0 0"}; max-width:460px; font-family:${NEWS}; font-size:18px; line-height:1.55; color:${t.muted}; text-wrap:pretty`}>{lk(b.body)}</p>
           </>
         );
         const year = <div style={css`font-family:${SERIF}; font-size:clamp(64px,7vw,112px); line-height:.84; color:${t.accent}`}>{b.year}</div>;
@@ -520,7 +639,7 @@ export default class RabbitHole extends React.Component<Props, State> {
             <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:${t.muted}`}>{label}</div>
             <h3 style={css`margin:12px 0 10px; font-family:${SERIF}; font-weight:400; font-size:64px; line-height:.95; text-wrap:balance`}>{c.name}</h3>
             <div style={css`font-family:${SERIF}; font-style:italic; font-size:24px; color:${t.accent}`}>{c.tagline}</div>
-            <p style={css`margin:18px 0 0; font-family:${NEWS}; font-size:19px; line-height:1.58; text-wrap:pretty`}>{c.body}</p>
+            <p style={css`margin:18px 0 0; font-family:${NEWS}; font-size:19px; line-height:1.58; text-wrap:pretty`}>{lk(c.body)}</p>
           </div>
         );
         return (
@@ -547,7 +666,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         return (
           <div style={css`padding:16px 0 40px`}>
             <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:${t.accent}`}>The verdict</div>
-            <p style={css`margin:14px 0 0; font-family:${SERIF}; font-style:italic; font-size:34px; line-height:1.2; text-wrap:pretty`}>{b.text}</p>
+            <p style={css`margin:14px 0 0; font-family:${SERIF}; font-style:italic; font-size:34px; line-height:1.2; text-wrap:pretty`}>{lk(b.text)}</p>
           </div>
         );
       case "plate":
@@ -561,7 +680,7 @@ export default class RabbitHole extends React.Component<Props, State> {
               <div>
                 <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.16em; text-transform:uppercase; opacity:.75`}>{b.tag}</div>
                 <h3 style={css`margin:12px 0 18px; font-family:${SERIF}; font-weight:400; font-size:${b.nameSize}; line-height:.95; letter-spacing:-.015em; text-wrap:balance`}>{b.name}</h3>
-                <p style={css`margin:0; max-width:620px; font-family:${NEWS}; font-size:18px; line-height:1.5; text-wrap:pretty`}>{b.body}</p>
+                <p style={css`margin:0; max-width:620px; font-family:${NEWS}; font-size:18px; line-height:1.5; text-wrap:pretty`}>{lk(b.body)}</p>
               </div>
             </div>
           </div>
@@ -569,7 +688,7 @@ export default class RabbitHole extends React.Component<Props, State> {
       case "closing":
         return (
           <p style={css`margin:0; padding:48px 0 140px; font-family:${NEWS}; font-size:22px; line-height:1.6; text-wrap:pretty`}>
-            {b.text} <span style={css`color:${t.accent}`}>■</span>
+            {lk(b.text)} <span style={css`color:${t.accent}`}>■</span>
           </p>
         );
       case "sources":
@@ -596,6 +715,8 @@ export default class RabbitHole extends React.Component<Props, State> {
     const hops = this.hops(), page = c?.page;
     const tr0 = s.trans;
     const blockList = page ? blocks(page, depth) : [];
+    const threads = (page?.threads || []).filter((th) => th?.term?.trim() && th.topic && th.title);
+    const used = new Set<number>(), lk = (text: string) => this.linkify(text, threads, used, t);
     const complete = c?.status === "ready";
     const showFork = !!(complete && page?.forks && s.revealed >= blockList.length);
     const sinkOn = this.props.sinkOnScroll ?? true;
@@ -605,7 +726,7 @@ export default class RabbitHole extends React.Component<Props, State> {
 
     const rd = (k: Kind) => (c ? s.ready[c.id + ":" + k] : undefined);
     const rdTxt = (k: Kind) => (rd(k) === "ready" ? "● Ready" : rd(k) === "error" ? "○ Will write on entry" : "◌ Writing…");
-    const open = s.forkOpen, hv = s.hover, chosen = tr0?.kind;
+    const open = s.forkOpen, hv = s.hover, chosen = tr0 && tr0.kind !== "thread" ? tr0.kind : undefined;
     const doorTf = (k: Kind, dir: number) => {
       if (!open) return `translate(${dir * 170}px, 60px) scale(.9)`;
       if (chosen) return chosen === k ? "scale(1.03)" : `translate(${-dir * 40}px, 20px) scale(.94)`;
@@ -632,7 +753,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         op: tr0.phase === "out" ? 0 : 1, pe: tr0.phase === "out" ? "none" : "auto",
         innerOp: tr0.phase === "grow" ? 1 : 0,
         innerTf: start ? "translateY(60px) scale(.9)" : tr0.phase === "out" ? "translateY(-60px) scale(1.04)" : "none",
-        label: `${tr0.kind === "deeper" ? "↓ Deeper" : "→ Sideways"} · falling to level`,
+        label: `${VIA[tr0.kind]} · falling to level`,
         num: pad(tr0.depth), title: tr0.title, waiting: !!tr0.waiting,
       };
     }
@@ -736,7 +857,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                 <div style={css`grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:14px; padding-bottom:18px; border-bottom:1px solid ${t.ink}; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}`}>
                   <span style={css`color:${t.ink}`}>Level {levelStr}</span>
                   <span>·</span>
-                  <span>{c?.via ? `${c.via === "deeper" ? "↓ Deeper" : "→ Sideways"} from “${c.fromTitle || ""}”` : "Where you started"}</span>
+                  <span>{c?.via ? `${VIA[c.via]} ${c.term ? `“${c.term}” ` : ""}from “${c.fromTitle || ""}”` : "Where you started"}</span>
                   <span style={css`margin-left:auto`}>{page?.layout ? `Format · ${cap(page.layout)}` : "Format · choosing"}</span>
                 </div>
                 <div style={css`grid-column:1 / -1; margin-top:44px; font-family:${MONO}; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:${t.accent}; min-height:16px`}>{page?.kicker || ""}</div>
@@ -746,6 +867,11 @@ export default class RabbitHole extends React.Component<Props, State> {
                 {page?.dek && (
                   <p style={css`grid-column:1 / span 7; margin:36px 0 0; font-family:${NEWS}; font-size:27px; line-height:1.35; text-wrap:pretty; color:${t.ink}`}>{page.dek}</p>
                 )}
+                {depth === 0 && threads.length > 0 && (
+                  <div style={css`grid-column:1 / -1; margin-top:32px; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:${t.muted}; animation:rh-pop 600ms ease`}>
+                    <span style={css`color:${t.accent}`}>↓</span> Underlined words are trapdoors. Tap one to fall in.
+                  </div>
+                )}
               </header>
 
               <div style={css`max-width:1280px; margin:0 auto; padding:0 96px; display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); column-gap:32px; row-gap:0`}>
@@ -753,7 +879,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                   const shown = i < s.revealed;
                   return (
                     <div key={i} style={css`grid-column:${b.col}; opacity:${shown ? 1 : 0}; transform:${shown ? "none" : "translateY(36px)"}; transition:opacity 700ms ease, transform 900ms cubic-bezier(.2,.7,.2,1)`}>
-                      {this.renderBlock(b, t)}
+                      {this.renderBlock(b, t, lk)}
                     </div>
                   );
                 })}
