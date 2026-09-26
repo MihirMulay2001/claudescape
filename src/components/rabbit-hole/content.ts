@@ -13,6 +13,27 @@ export interface Thread extends Fork {
 /** How the reader reached a page: through one of the two doors, or through a trapdoor in the text. */
 export type Via = Kind | "thread";
 export const VIA: Record<Via, string> = { deeper: "↓ Deeper", sideways: "→ Sideways", thread: "↘ Trapdoor" };
+/** An interactive toy placed in the page. */
+export type Demo =
+  | {
+      /** "What happens if…": a dial the reader turns through escalating stops. */
+      kind: "slider";
+      title: string;
+      control: string;
+      readout: string;
+      stops: { at: string; value: string; caption: string }[];
+    }
+  | {
+      /** Guess a surprising number on a slider, then see how far off you were. */
+      kind: "guess";
+      question: string;
+      unit: string;
+      min: number;
+      max: number;
+      answer: number;
+      log: boolean;
+      reveal: string;
+    };
 export interface Contender {
   name: string;
   tagline: string;
@@ -40,6 +61,7 @@ export interface Page {
   closing?: string;
   forks?: Partial<Record<Kind, Fork>>;
   threads?: Thread[];
+  demo?: Demo;
   /** Web sources the page was grounded in (added client-side, not written by the model). */
   sources?: Source[];
 }
@@ -126,8 +148,52 @@ export const TAIL = `"closing": "final paragraph, 40-60 words, leaving a thread 
 export const FORK_RULES = `Forks are two doors at the bottom of the page. "deeper" goes into the more intense, extreme, high-stakes or technical side of THIS page (e.g. sports cars → "Inside the 5G forces of an F1 race"). "sideways" is a weird, delightful, surprising tangent linked by one unexpected thread (e.g. sports cars → "The whimsical car designs that never made it"). Both must be specific and irresistible, and must not revisit any topic already in the journey.
 Threads are trapdoors hidden in the text: the most intriguing names, phenomena, objects or places the page mentions in passing, each worth a page of its own. Spread them across the page, and make each topic distinct from the forks, from each other and from the journey so far.`;
 
+const DEMO_SHAPES: Record<Demo["kind"], string> = {
+  slider: `{"kind": "slider", "title": "a 'What happens if…' question, max 10 words", "control": "what the reader turns up, max 5 words", "readout": "what the big number measures, max 6 words", "stops": [5-7 items, from mildest to most extreme: {"at": "the setting, shown on the slider track, max 10 characters", "value": "the big readout at that setting: a number with a short unit, max 8 characters", "caption": "what is happening at this setting, vivid and concrete, 18-30 words"}]}`,
+  guess: `{"kind": "guess", "question": "a question whose answer is one surprising number, max 16 words", "unit": "unit shown after the number, max 14 characters, may be empty", "min": number, "max": number, "answer": number, "log": true when max is 1000+ times min, "reveal": "why the answer is what it is, 30-45 words"}`,
+};
+const DEMO_RULE: Record<Demo["kind"], string> = {
+  slider: `a dial the reader turns to watch something escalate. Each stop's value is a real figure or a sound estimate, and the last stop is jaw-dropping.`,
+  guess: `the reader guesses one number, then sees the real one. Choose the number about this page's subject that people misjudge most wildly (a count, size, duration, speed, age or percentage). min and max are plain numbers bracketing the answer, with the answer well away from the middle of the range; min is above 0 when log is true.`,
+};
+
+/** Picks the demo kind in code so pages alternate: random on the first page, then the other kind from the previous page. */
+export const demoKind = (prev?: string): Demo["kind"] => (prev === "slider" ? "guess" : prev === "guess" ? "slider" : Math.random() < 0.5 ? "slider" : "guess");
+export const demoSchema = (kind: Demo["kind"]) => `"demo": ${DEMO_SHAPES[kind]}`;
+export const demoRule = (kind: Demo["kind"]) =>
+  `The demo is an interactive toy placed in the middle of the page, the moment readers remember: ${DEMO_RULE[kind]} Never contradict the page, and do not invent statistics.`;
+
 export const layoutRule = (prev?: string) =>
   `Choose the layout that best suits the content: story (a narrative, a person, an event), timeline (history, evolution), comparison (two rivals, eras or approaches), gallery (visual subjects: designs, creatures, objects, places).${prev ? ` Avoid "${prev}" (the previous page's layout) unless nothing else fits.` : ""}`;
+
+const num = (v: unknown) => (typeof v === "number" ? v : Number(String(v ?? "").replace(/[,\s]/g, "")));
+const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+/** Checks a model-written demo and normalises it; anything unusable becomes undefined so the page simply has no demo. */
+export function checkDemo(d: unknown): Demo | undefined {
+  let o = (d || {}) as Record<string, unknown>;
+  // The model sometimes nests the demo one level down ({"demo": …} or {"page": {"demo": …}}).
+  for (let i = 0; i < 2 && !o.kind; i++) o = ((o.demo || (o.page as Record<string, unknown>)?.demo || {}) as Record<string, unknown>);
+  if (o.kind === "slider") {
+    const stops = (Array.isArray(o.stops) ? o.stops : [])
+      .map((x: Record<string, unknown>) => ({ at: str(x?.at), value: str(x?.value), caption: str(x?.caption) }))
+      .filter((x) => x.at && x.value && x.caption);
+    if (!str(o.title) || stops.length < 3) return undefined;
+    return { kind: "slider", title: str(o.title), control: str(o.control), readout: str(o.readout), stops: stops.slice(0, 8) };
+  }
+  if (o.kind === "guess") {
+    let min = num(o.min), max = num(o.max);
+    const answer = num(o.answer);
+    if (![min, max, answer].every(Number.isFinite) || !str(o.question) || !str(o.reveal) || max <= min) return undefined;
+    let log = o.log === true || o.log === "true";
+    if (log && min <= 0) log = false;
+    // Keep the answer on the track, off its very ends.
+    if (answer <= min) min = log ? answer / 10 : answer - (max - min) * 0.2;
+    if (answer >= max) max = log ? answer * 10 : answer + (max - min) * 0.2;
+    return { kind: "guess", question: str(o.question), unit: str(o.unit), min, max, answer, log, reveal: str(o.reveal) };
+  }
+  return undefined;
+}
 
 export function parseJSON(t: string): Page {
   t = String(t || "").replace(/```json|```/g, "");

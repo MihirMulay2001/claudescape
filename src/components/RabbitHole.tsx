@@ -4,9 +4,10 @@ import React from "react";
 import { css, MONO, NEWS, SERIF } from "./rabbit-hole/css";
 import MapCanvas from "./rabbit-hole/MapCanvas";
 import TopicStream from "./rabbit-hole/TopicStream";
+import DemoBlock from "./rabbit-hole/Demo";
 import {
-  alpha, ask, cap, DOOR, FORK_RULES, grounding, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, research, sleep, SHAPES, TAIL,
-  VIA, type Contender, type Fork, type Kind, type Page, type Source, type Theme, type Thread, type Via,
+  alpha, ask, cap, checkDemo, demoKind, demoRule, demoSchema, DOOR, FORK_RULES, grounding, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, research, sleep, SHAPES, TAIL,
+  VIA, type Contender, type Demo, type Fork, type Kind, type Page, type Source, type Theme, type Thread, type Via,
 } from "./rabbit-hole/content";
 
 type Status = "loading" | "ready" | "error";
@@ -22,6 +23,7 @@ interface JourneyNode {
   term?: string;
   fromTitle?: string;
   prevLayout?: string;
+  prevDemo?: string;
   status: Status;
   page: Page | null;
   error?: string | null;
@@ -79,6 +81,7 @@ type Block = { col: string } & (
   | { type: "plate"; name: string; year: string; tag: string; body: string; num: string; tone: string; minH: string; nameSize: string }
   | { type: "closing"; text: string }
   | { type: "sources"; sources: Source[] }
+  | { type: "demo"; demo: Demo }
 );
 
 /** Hover style: background (and optionally color) applied via the .rh-hbg / .rh-hc classes. */
@@ -115,6 +118,15 @@ function blocks(page: Page, depth: number): Block[] {
         col,
       });
     });
+  }
+  // The demo sits mid-page: after the second story section, third event, the comparison rows or the third plate.
+  if (page.demo) {
+    const after = page.story ? "section" : page.timeline ? "event" : page.comparison ? "rows" : "plate";
+    const nth = page.story ? 2 : page.comparison ? 1 : 3;
+    let seen = 0, at = -1;
+    out.forEach((b, i) => { if (b.type === after && ++seen === nth) at = i + 1; });
+    if (at < 0 && seen > 0) at = out.length;
+    if (at >= 0) out.splice(at, 0, { type: "demo", demo: page.demo, col: "1 / -1" });
   }
   if (page.closing) out.push({ type: "closing", text: page.closing, col: "3 / span 7" });
   if (page.sources?.length) out.push({ type: "sources", sources: page.sources, col: "3 / span 7" });
@@ -199,6 +211,9 @@ export default class RabbitHole extends React.Component<Props, State> {
     const n = blocks(c.page, c.depth).length;
     if (this.state.revealed < n) this.setState((s) => ({ revealed: s.revealed + 1 }), () => this.handleScroll());
   }
+  patchPage(id: number, patch: Partial<Page>) {
+    this.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id && n.page ? { ...n, page: { ...n.page, ...patch } } : n)) }));
+  }
   updateNode(id: number, patch: Partial<JourneyNode>) {
     this.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)) }));
   }
@@ -211,9 +226,15 @@ export default class RabbitHole extends React.Component<Props, State> {
       const head = await ask(`${ctx(node, path)}\n${grounding(notes)}${layoutRule(node.prevLayout)}\nReturn only the opening of the page as JSON with exactly these keys:\n{${HEAD}}`, 700);
       if (!SHAPES[head.layout]) head.layout = "story";
       this.updateNode(node.id, { page: head });
+      // The demo is written alongside the body so it doesn't hold up the page; whichever lands second merges in.
+      const kind = demoKind(node.prevDemo);
+      const demoP = ask(`${ctx(node, path)}\n${grounding(notes)}You are adding an interactive demo to this page: ${JSON.stringify(head)}\n${demoRule(kind)}\nReturn only a JSON object with one key:\n{${demoSchema(kind)}}`, 900)
+        .then(checkDemo)
+        .catch(() => undefined);
+      demoP.then((demo) => demo && this.patchPage(node.id, { demo }));
       const body = await ask(`${ctx(node, path)}\n${grounding(notes)}You already wrote this opening: ${JSON.stringify(head)}\nNow write the rest of this ${head.layout} page. Return JSON with exactly these keys:\n{${SHAPES[head.layout]},\n${TAIL}}\n${FORK_RULES}`, 2900);
       const page = { ...head, ...body, layout: head.layout, sources: notes.sources };
-      this.updateNode(node.id, { page, status: "ready" });
+      this.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === node.id ? { ...n, status: "ready", page: { ...page, demo: n.page?.demo } } : n)) }));
       this.prefetch({ ...node, page }, path);
     } catch (e) {
       this.updateNode(node.id, { status: "error", error: errMsg(e) });
@@ -235,13 +256,15 @@ export default class RabbitHole extends React.Component<Props, State> {
     const key = node.id + ":" + slot;
     if (this.pre[key]) return;
     const child = { topic: f.topic, title: f.title, teaser: f.teaser, via, term: (f as Thread).term };
+    const kind = demoKind(node.page?.demo?.kind);
     const promise = (async () => {
       const notes = await research(f.topic, f.title, "deep", budgetMs, () => research(f.topic, f.title, "fast", 2500));
-      const prompt = `${ctx(child, [...path])}\n${grounding(notes)}${layoutRule(node.page?.layout)}\nReturn one JSON object with exactly these keys (include ONLY the one layout key matching your chosen layout):\n{${HEAD},\n<layout key>: one of:\n  ${Object.values(SHAPES).join("\n  ")},\n${TAIL}}\n${FORK_RULES}`;
-      const d = await ask(prompt, 3500);
+      const prompt = `${ctx(child, [...path])}\n${grounding(notes)}${layoutRule(node.page?.layout)}\nReturn one JSON object with exactly these keys (include ONLY the one layout key matching your chosen layout):\n{${HEAD},\n<layout key>: one of:\n  ${Object.values(SHAPES).join("\n  ")},\n${TAIL},\n${demoSchema(kind)}}\n${FORK_RULES}\n${demoRule(kind)}`;
+      const d = await ask(prompt, 4200);
       if (!d.title || !d.forks) throw new Error("Incomplete page.");
       if (!SHAPES[d.layout]) d.layout = LAYOUTS.find((k) => d[k]) || "story";
       d.sources = notes.sources;
+      d.demo = checkDemo(d);
       this.setState((s) => ({ ready: { ...s.ready, [key]: "ready" } }));
       return d;
     })();
@@ -328,7 +351,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     if (el < 950) await sleep(950 - el);
     const node: JourneyNode = {
       id: this.nid++, topic: f.topic, title: f.title, teaser: f.teaser, depth, via, term: (f as Thread).term, fromTitle: c.page?.title,
-      prevLayout: c.page?.layout, status: data ? "ready" : "error", page: data, error: err ? errMsg(err) : null,
+      prevLayout: c.page?.layout, prevDemo: c.page?.demo?.kind, status: data ? "ready" : "error", page: data, error: err ? errMsg(err) : null,
     };
     window.scrollTo(0, 0);
     // Taking a different door from an earlier page starts a new branch there.
@@ -691,6 +714,8 @@ export default class RabbitHole extends React.Component<Props, State> {
             {lk(b.text)} <span style={css`color:${t.accent}`}>■</span>
           </p>
         );
+      case "demo":
+        return <DemoBlock key={this.cur()?.id} d={b.demo} t={t} />;
       case "sources":
         return (
           <div style={css`margin-top:-100px; padding:24px 0 140px; border-top:1px solid ${t.rule}`}>
