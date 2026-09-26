@@ -2,9 +2,10 @@
 
 import React from "react";
 import { css, MONO, NEWS, SERIF } from "./rabbit-hole/css";
+import MapCanvas from "./rabbit-hole/MapCanvas";
 import {
-  alpha, ask, cap, DOOR, EXAMPLES, FORK_RULES, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, sleep, SHAPES, TAIL,
-  type Contender, type Kind, type Page, type Theme,
+  alpha, ask, cap, DOOR, EXAMPLES, FORK_RULES, grounding, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, research, sleep, SHAPES, TAIL,
+  type Contender, type Kind, type Page, type Source, type Theme,
 } from "./rabbit-hole/content";
 
 type Status = "loading" | "ready" | "error";
@@ -40,6 +41,8 @@ interface State {
   query: string;
   falling: boolean;
   nodes: JourneyNode[];
+  /** Index of the page being read — the end of the path unless revisiting from the map. */
+  at: number;
   revealed: number;
   forkOpen: boolean;
   hover: Kind | null;
@@ -70,6 +73,7 @@ type Block = { col: string } & (
   | { type: "verdict"; text: string }
   | { type: "plate"; name: string; year: string; tag: string; body: string; num: string; tone: string; minH: string; nameSize: string }
   | { type: "closing"; text: string }
+  | { type: "sources"; sources: Source[] }
 );
 
 /** Hover style: background (and optionally color) applied via the .rh-hbg / .rh-hc classes. */
@@ -108,6 +112,7 @@ function blocks(page: Page, depth: number): Block[] {
     });
   }
   if (page.closing) out.push({ type: "closing", text: page.closing, col: "3 / span 7" });
+  if (page.sources?.length) out.push({ type: "sources", sources: page.sources, col: "3 / span 7" });
   return out;
 }
 
@@ -120,7 +125,7 @@ const errMsg = (e: unknown) => String((e as Error)?.message || e);
 
 export default class RabbitHole extends React.Component<Props, State> {
   state: State = {
-    screen: "landing", query: "", falling: false, nodes: [], revealed: 0, forkOpen: false, hover: null,
+    screen: "landing", query: "", falling: false, nodes: [], at: 0, revealed: 0, forkOpen: false, hover: null,
     trans: null, map: null, mapDrawn: false, scrollP: 0, ready: {}, loadIdx: 0, copied: false,
   };
   forkRef = React.createRef<HTMLElement>();
@@ -147,9 +152,13 @@ export default class RabbitHole extends React.Component<Props, State> {
     clearInterval(this.revealT);
     clearInterval(this.loadT);
   }
-  cur() {
+  cur(): JourneyNode | undefined {
     const n = this.state.nodes;
-    return n[n.length - 1];
+    return n[Math.min(this.state.at, n.length - 1)];
+  }
+  /** Topics from the start up to (and including) the page being read. */
+  pathTo(i: number) {
+    return this.state.nodes.slice(0, i + 1).map((n) => n.topic);
   }
   hops() {
     return this.props.hops ?? 3;
@@ -175,11 +184,14 @@ export default class RabbitHole extends React.Component<Props, State> {
 
   async genSplit(node: JourneyNode, path: string[]) {
     try {
-      const head = await ask(`${ctx(node, path)}\n${layoutRule(node.prevLayout)}\nReturn only the opening of the page as JSON with exactly these keys:\n{${HEAD}}`, 700);
+      // The reader is waiting, so ground this page in search snippets only (~1s). The Wikipedia scrape
+      // (~8-15s) is reserved for prefetched pages, where it runs while the reader is still reading.
+      const notes = await research(node.topic, node.title, "fast", 4500);
+      const head = await ask(`${ctx(node, path)}\n${grounding(notes)}${layoutRule(node.prevLayout)}\nReturn only the opening of the page as JSON with exactly these keys:\n{${HEAD}}`, 700);
       if (!SHAPES[head.layout]) head.layout = "story";
       this.updateNode(node.id, { page: head });
-      const body = await ask(`${ctx(node, path)}\nYou already wrote this opening: ${JSON.stringify(head)}\nNow write the rest of this ${head.layout} page. Return JSON with exactly these keys:\n{${SHAPES[head.layout]},\n${TAIL}}\n${FORK_RULES}`, 2600);
-      const page = { ...head, ...body, layout: head.layout };
+      const body = await ask(`${ctx(node, path)}\n${grounding(notes)}You already wrote this opening: ${JSON.stringify(head)}\nNow write the rest of this ${head.layout} page. Return JSON with exactly these keys:\n{${SHAPES[head.layout]},\n${TAIL}}\n${FORK_RULES}`, 2600);
+      const page = { ...head, ...body, layout: head.layout, sources: notes.sources };
       this.updateNode(node.id, { page, status: "ready" });
       this.prefetch({ ...node, page }, path);
     } catch (e) {
@@ -192,13 +204,18 @@ export default class RabbitHole extends React.Component<Props, State> {
       const key = node.id + ":" + kind;
       if (!f || this.pre[key]) return;
       const child = { topic: f.topic, title: f.title, teaser: f.teaser, via: kind };
-      const prompt = `${ctx(child, [...path])}\n${layoutRule(node.page?.layout)}\nReturn one JSON object with exactly these keys (include ONLY the one layout key matching your chosen layout):\n{${HEAD},\n<layout key>: one of:\n  ${Object.values(SHAPES).join("\n  ")},\n${TAIL}}\n${FORK_RULES}`;
-      const promise = ask(prompt, 3200).then((d) => {
+      // Runs in the background while the reader is on this page, so it can afford the Wikipedia scrape
+      // (capped at 12s; past that, fall back to the search snippets alone).
+      const promise = (async () => {
+        const notes = await research(f.topic, f.title, "deep", 12000, () => research(f.topic, f.title, "fast", 2500));
+        const prompt = `${ctx(child, [...path])}\n${grounding(notes)}${layoutRule(node.page?.layout)}\nReturn one JSON object with exactly these keys (include ONLY the one layout key matching your chosen layout):\n{${HEAD},\n<layout key>: one of:\n  ${Object.values(SHAPES).join("\n  ")},\n${TAIL}}\n${FORK_RULES}`;
+        const d = await ask(prompt, 3200);
         if (!d.title || !d.forks) throw new Error("Incomplete page.");
         if (!SHAPES[d.layout]) d.layout = LAYOUTS.find((k) => d[k]) || "story";
+        d.sources = notes.sources;
         this.setState((s) => ({ ready: { ...s.ready, [key]: "ready" } }));
         return d;
-      });
+      })();
       promise.catch(() => this.setState((s) => ({ ready: { ...s.ready, [key]: "error" } })));
       this.pre[key] = { promise };
     });
@@ -211,26 +228,36 @@ export default class RabbitHole extends React.Component<Props, State> {
     setTimeout(() => {
       const node: JourneyNode = { id: this.nid++, topic: topic.toLowerCase(), depth: 0, via: null, status: "loading", page: null };
       window.scrollTo(0, 0);
-      this.setState({ screen: "journey", falling: false, nodes: [node], revealed: 0, forkOpen: false, hover: null, map: null, trans: null, scrollP: 0 });
+      this.setState({ screen: "journey", falling: false, nodes: [node], at: 0, revealed: 0, forkOpen: false, hover: null, map: null, trans: null, scrollP: 0 });
       this.genSplit(node, [node.topic]);
     }, 1000);
   }
   retry() {
     const c = this.cur();
     if (!c) return;
-    const path = this.state.nodes.map((n) => n.topic);
+    const path = this.pathTo(this.state.at);
     this.updateNode(c.id, { status: "loading", page: null, error: null });
     this.setState({ revealed: 0 });
     this.genSplit({ ...c }, path);
   }
-  async pick(kind: Kind, e: React.MouseEvent<HTMLDivElement>) {
+  async pick(kind: Kind, r: DOMRect) {
     if (this.state.trans) return;
-    const c = this.cur();
+    const c = this.cur(), at = this.state.at;
     const f = c?.page?.forks?.[kind];
     if (!c || !f) return;
-    const r = e.currentTarget.getBoundingClientRect();
     const depth = c.depth + 1, key = c.id + ":" + kind;
-    const path = this.state.nodes.map((n) => n.topic);
+    const path = this.pathTo(at);
+    // Revisiting a page and taking the same door again: walk back into the existing path.
+    const next = this.state.nodes[at + 1];
+    if (next?.via === kind) {
+      this.setState({ trans: { phase: "start", rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width }, kind, title: f.title, depth, waiting: false } });
+      requestAnimationFrame(() => requestAnimationFrame(() => this.setState((s) => ({ trans: s.trans && { ...s.trans, phase: "grow" } }))));
+      await sleep(950);
+      window.scrollTo(0, 0);
+      this.setState((s) => ({ at: at + 1, revealed: 1, forkOpen: false, hover: null, scrollP: 0, trans: s.trans && { ...s.trans, phase: "out" } }));
+      setTimeout(() => this.setState({ trans: null }), 650);
+      return;
+    }
     if (!this.pre[key]) this.prefetch(c, path);
     this.setState((s) => ({
       nodes: s.nodes.map((n) => (n.id === c.id ? { ...n, chosen: kind } : n)),
@@ -253,9 +280,20 @@ export default class RabbitHole extends React.Component<Props, State> {
       prevLayout: c.page?.layout, status: data ? "ready" : "error", page: data, error: err ? errMsg(err) : null,
     };
     window.scrollTo(0, 0);
-    this.setState((s) => ({ nodes: [...s.nodes, node], revealed: 1, forkOpen: false, hover: null, scrollP: 0, trans: s.trans && { ...s.trans, phase: "out", waiting: false } }));
+    // Taking a different door from an earlier page starts a new branch there.
+    this.setState((s) => ({ nodes: [...s.nodes.slice(0, at + 1), node], at: at + 1, revealed: 1, forkOpen: false, hover: null, scrollP: 0, trans: s.trans && { ...s.trans, phase: "out", waiting: false } }));
     if (data) this.prefetch(node, [...path, node.topic]);
     setTimeout(() => this.setState({ trans: null }), 650);
+  }
+  /** Jump to page i of the path (from the map). With `doors`, land on its fork with that door highlighted. */
+  goTo(i: number, doors?: Kind) {
+    const n = this.state.nodes[i];
+    if (!n) return;
+    const all = n.page ? blocks(n.page, n.depth).length : 0;
+    if (!doors) window.scrollTo(0, 0);
+    this.setState({ map: null, at: i, revealed: all, forkOpen: !!doors, hover: doors ?? null, scrollP: 0 }, () => {
+      if (doors) requestAnimationFrame(() => this.forkRef.current?.scrollIntoView({ block: "start" }));
+    });
   }
   openMap(finale: boolean) {
     this.setState({ map: { finale }, mapDrawn: false, copied: false });
@@ -263,7 +301,7 @@ export default class RabbitHole extends React.Component<Props, State> {
   }
   goHome() {
     window.scrollTo(0, 0);
-    this.setState({ screen: "landing", nodes: [], query: "", map: null, trans: null, revealed: 0, forkOpen: false, falling: false });
+    this.setState({ screen: "landing", nodes: [], at: 0, query: "", map: null, trans: null, revealed: 0, forkOpen: false, falling: false });
   }
 
   // ─── Pieces ──────────────────────────────────────────────────────────────
@@ -330,7 +368,7 @@ export default class RabbitHole extends React.Component<Props, State> {
   buildMap() {
     const s = this.state, ns = s.nodes;
     if (!ns.length || !s.map) return null;
-    const finale = s.map.finale, last = ns[ns.length - 1];
+    const finale = s.map.finale, last = ns[ns.length - 1], at = Math.min(s.at, ns.length - 1);
     const lp = pal(finale ? last.depth + 1 : last.depth);
     const U = 270, R = 138, PX = 30, PY = 20, step = finale ? 0.55 : 0.3;
     let x = 0;
@@ -363,9 +401,19 @@ export default class RabbitHole extends React.Component<Props, State> {
     const w = PX * 2 + (maxX - minX) * U + 270, hgt = PY * 2 + (rows - 1) * R + 110;
     const drawn = s.mapDrawn;
     const items = raw.map((r) => {
-      const vis = r.kind === "visited", isCur = vis && r.i === ns.length - 1;
+      const vis = r.kind === "visited", isCur = vis && r.i === at;
       const via = r.kind === "visited" ? r.n.via : r.k;
-      const meta = vis ? (r.i === 0 ? "Start" : `L${pad(r.i)} · ${via}`) : `L${pad(r.i + 1)} · ${via} · ${r.kind === "ahead" ? "ahead" : "not taken"}`;
+      const here = isCur && at < ns.length - 1 ? " · you are here" : "";
+      const meta = vis ? (r.i === 0 ? "Start" + here : `L${pad(r.i)} · ${via}${here}`) : `L${pad(r.i + 1)} · ${via} · ${r.kind === "ahead" ? "ahead" : "not taken"}`;
+      // Visited → reopen that page. Ahead → take the door. Not taken → the page it branched from, at its doors.
+      const open = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (r.kind === "visited") return this.goTo(r.i);
+        if (r.kind === "skipped") return this.goTo(r.i, r.k);
+        const rect = e.currentTarget.getBoundingClientRect(), k = r.k;
+        if (s.at !== r.i) window.scrollTo(0, 0);
+        this.setState({ map: null, at: r.i, hover: null }, () => this.pick(k, rect));
+      };
+      const hint = r.kind === "visited" ? (r.i === at ? "Back to this page" : "Open this page") : r.kind === "ahead" ? "Take this door" : "Go to this fork";
       const final = vis ? 1 : 0.7;
       return {
         left: px(r.x) + 10 + "px", top: py(r.y) - 16 + "px",
@@ -374,6 +422,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         fs: vis ? "25px" : "19px", c: vis ? lp.ink : lp.muted, subC: lp.muted, metaC: vis ? lp.accent : lp.muted,
         dotBg: vis ? (r.i === 0 ? lp.soft : lp.accent) : "transparent", dotBorder: vis ? lp.accent : lp.muted,
         ring: isCur && !finale ? `0 0 0 7px ${alpha(lp.accent, 0.25)}` : isCur ? `0 0 0 7px ${alpha(lp.accent, 0.18)}` : "none",
+        open, hint,
       };
     });
     const svg = (
@@ -404,7 +453,7 @@ export default class RabbitHole extends React.Component<Props, State> {
         { v: pad(skipped), l: "Doors left closed" },
       ],
       footer: `${ns[0].topic} → ${last.topic}`,
-      w: w + "px", h: hgt + "px", items, svg,
+      w, h: hgt, focus: { x: px(pos[at]), y: py(at) }, items, svg,
       copyLabel: s.copied ? "Copied" : "Copy share text",
       shareText: `I fell ${last.depth} levels down the rabbit hole: started at ${ns[0].topic}, ended up at ${last.topic}.`,
     };
@@ -522,13 +571,26 @@ export default class RabbitHole extends React.Component<Props, State> {
             {b.text} <span style={css`color:${t.accent}`}>■</span>
           </p>
         );
+      case "sources":
+        return (
+          <div style={css`margin-top:-100px; padding:24px 0 140px; border-top:1px solid ${t.rule}`}>
+            <div style={css`font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${t.muted}`}>Sources</div>
+            <ol style={css`margin:12px 0 0; padding-left:20px; font-family:${MONO}; font-size:12px; line-height:1.9; color:${t.muted}`}>
+              {b.sources.map((src) => (
+                <li key={src.url}>
+                  <a href={src.url} target="_blank" rel="noopener noreferrer" style={css`color:inherit; text-decoration-color:${t.rule}`}>{src.title || new URL(src.url).hostname}</a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        );
     }
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
   render() {
-    const s = this.state, nodes = s.nodes, c = nodes[nodes.length - 1];
+    const s = this.state, nodes = s.nodes, c = this.cur(), revisiting = s.at < nodes.length - 1;
     const depth = c ? c.depth : 0, t = pal(depth), tn = pal(depth + 1);
     const hops = this.hops(), page = c?.page;
     const tr0 = s.trans;
@@ -579,7 +641,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     const ticks = [];
     for (let i = 0; i <= maxL; i++)
       ticks.push({ w: i === depth ? "34px" : i < depth ? "16px" : "8px", c: i === depth ? t.accent : i < depth ? t.muted : t.rule, label: pad(i), op: i === depth ? 1 : 0 });
-    const crumbs = nodes.slice(-4).map((n, i, arr) => ({ label: n.topic, c: i === arr.length - 1 ? t.ink : t.muted, arrowOp: i === 0 && nodes.length <= 4 ? 0 : 1 }));
+    const crumbs = nodes.slice(0, s.at + 1).slice(-4).map((n, i, arr) => ({ label: n.topic, c: i === arr.length - 1 ? t.ink : t.muted, arrowOp: i === 0 && s.at < 4 ? 0 : 1 }));
 
     const mp = this.buildMap();
     const levelStr = pad(depth);
@@ -648,6 +710,15 @@ export default class RabbitHole extends React.Component<Props, State> {
                   </span>
                 ))}
               </div>
+              {revisiting && (
+                <button
+                  onClick={() => this.goTo(nodes.length - 1)}
+                  className={btnSoft.className}
+                  style={{ ...css`flex:none; border:0; border-radius:999px; padding:9px 14px; background:transparent; color:${t.muted}; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`, ...btnSoft.vars }}
+                >
+                  Back to L{pad(nodes[nodes.length - 1].depth)} ↓
+                </button>
+              )}
               <button
                 onClick={() => this.openMap(false)}
                 className={btnSoft.className}
@@ -722,14 +793,18 @@ export default class RabbitHole extends React.Component<Props, State> {
                   <div style={css`max-width:1000px; margin:0 auto; text-align:center`}>
                     <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:${t.muted}`}>Bottom of level {levelStr}</div>
                     <h2 style={css`margin:18px 0 0; font-family:${SERIF}; font-weight:400; font-size:clamp(64px,7vw,116px); line-height:.92; letter-spacing:-.02em`}>The path splits.</h2>
-                    <p style={css`margin:22px auto 0; max-width:520px; font-family:${NEWS}; font-size:21px; line-height:1.45; color:${t.muted}`}>Two doors lead further down, and both pages are already written. Pick one.</p>
+                    <p style={css`margin:22px auto 0; max-width:520px; font-family:${NEWS}; font-size:21px; line-height:1.45; color:${t.muted}`}>
+                      {revisiting
+                        ? "You’ve been here before. Your door leads back into your path; the other one starts a new branch from this page and replaces what came after."
+                        : "Two doors lead further down, and both pages are already written. Pick one."}
+                    </p>
                   </div>
                   <div style={css`max-width:1000px; margin:36px auto 0`}>{this.forkSvg(open, chosen || hv, t)}</div>
                   <div style={css`max-width:1000px; margin:0 auto; display:flex; justify-content:center`}>
                     <div
                       role="button"
                       tabIndex={0}
-                      onClick={(e) => this.pick("deeper", e)}
+                      onClick={(e) => this.pick("deeper", e.currentTarget.getBoundingClientRect())}
                       onMouseEnter={() => !s.trans && this.setState({ hover: "deeper" })}
                       onMouseLeave={() => !s.trans && this.setState({ hover: null })}
                       style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 70% 55% at 50% 30%, oklch(0.07 0.02 285) 0%, oklch(0.16 0.035 290) 55%, oklch(0.23 0.05 305) 100%); color:oklch(0.95 0.015 70); box-shadow:${doorSh("deeper")}; transform:${doorTf("deeper", 1)}; opacity:${doorOp("deeper")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
@@ -745,7 +820,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                         <div style={css`font-family:${SERIF}; font-size:38px; line-height:1.02; text-wrap:balance`}>{fk.d?.title}</div>
                         <div style={css`font-family:${NEWS}; font-size:17px; line-height:1.4; color:oklch(0.82 0.03 290); text-wrap:pretty`}>{fk.d?.teaser}</div>
                         <div style={css`display:flex; justify-content:space-between; padding-top:14px; border-top:1px solid oklch(1 0 0 / 0.18); font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase`}>
-                          <span>Open this door</span>
+                          <span>{revisiting && c?.chosen === "deeper" ? "Your path" : "Open this door"}</span>
                           <span style={css`color:${fk.dReadyC}`}>{rdTxt("deeper")}</span>
                         </div>
                       </div>
@@ -754,7 +829,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                     <div
                       role="button"
                       tabIndex={0}
-                      onClick={(e) => this.pick("sideways", e)}
+                      onClick={(e) => this.pick("sideways", e.currentTarget.getBoundingClientRect())}
                       onMouseEnter={() => !s.trans && this.setState({ hover: "sideways" })}
                       onMouseLeave={() => !s.trans && this.setState({ hover: null })}
                       style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 80% 60% at 72% 28%, oklch(0.9 0.08 75) 0%, oklch(0.79 0.12 58) 58%, oklch(0.71 0.13 45) 100%); color:oklch(0.2 0.04 40); box-shadow:${doorSh("sideways")}; transform:${doorTf("sideways", -1)}; opacity:${doorOp("sideways")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
@@ -770,7 +845,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                         <div style={css`font-family:${SERIF}; font-size:38px; line-height:1.02; text-wrap:balance`}>{fk.s?.title}</div>
                         <div style={css`font-family:${NEWS}; font-size:17px; line-height:1.4; color:oklch(0.3 0.05 40); text-wrap:pretty`}>{fk.s?.teaser}</div>
                         <div style={css`display:flex; justify-content:space-between; padding-top:14px; border-top:1px solid oklch(0.2 0.04 40 / 0.22); font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase`}>
-                          <span>Open this door</span>
+                          <span>{revisiting && c?.chosen === "sideways" ? "Your path" : "Open this door"}</span>
                           <span style={css`color:${fk.sReadyC}`}>{rdTxt("sideways")}</span>
                         </div>
                       </div>
@@ -824,28 +899,35 @@ export default class RabbitHole extends React.Component<Props, State> {
                   {mp.midway && (<>You’re {mp.levels} levels below <em style={css`color:${mp.accent}`}>{mp.root}</em>, somewhere around <em style={css`color:${mp.accent}`}>{mp.last}</em>.</>)}
                   {mp.top && (<>You’re still at the surface of <em style={css`color:${mp.accent}`}>{mp.root}</em>. Two doors wait at the bottom of the page.</>)}
                 </h1>
-                <div style={css`margin-top:48px; display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; border-top:1px solid ${mp.rule}; padding-top:40px`}>
-                  <div style={css`display:flex; flex-direction:column; gap:28px`}>
-                    {mp.stats.map((st) => (
-                      <div key={st.l}>
-                        <div style={css`font-family:${SERIF}; font-size:64px; line-height:.9`}>{st.v}</div>
-                        <div style={css`margin-top:6px; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>{st.l}</div>
+                <div style={css`margin-top:48px; display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:28px; border-top:1px solid ${mp.rule}; padding-top:36px`}>
+                  {mp.stats.map((st) => (
+                    <div key={st.l}>
+                      <div style={css`font-family:${SERIF}; font-size:64px; line-height:.9`}>{st.v}</div>
+                      <div style={css`margin-top:6px; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>{st.l}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={css`margin-top:36px`}>
+                  <MapCanvas width={mp.w} height={mp.h} focus={mp.focus} ink={mp.ink} muted={mp.muted} rule={mp.rule} bg={mp.card}>
+                    {mp.svg}
+                    {mp.items.map((it, i) => (
+                      <div
+                        key={i}
+                        role="button"
+                        tabIndex={0}
+                        title={it.hint}
+                        onClick={it.open}
+                        onKeyDown={(e) => { if (e.key === "Enter") it.open(e as unknown as React.MouseEvent<HTMLDivElement>); }}
+                        className="rh-hbg"
+                        style={{ ...css`position:absolute; left:${it.left}; top:${it.top}; width:260px; padding:4px 8px; border-radius:4px; background:${mp.card}; cursor:pointer; opacity:${it.op}; transform:${it.tf}; transition:opacity 500ms ease ${it.delay}, transform 600ms ease ${it.delay}, background 200ms`, ["--h-bg" as string]: mp.rule }}
+                      >
+                        <div style={css`position:absolute; left:-17px; top:9px; width:14px; height:14px; border-radius:50%; background:${it.dotBg}; border:2px solid ${it.dotBorder}; box-shadow:${it.ring}`} />
+                        <div style={css`font-family:${MONO}; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:${it.metaC}`}>{it.meta}</div>
+                        <div style={css`margin:5px 0 4px; font-family:${SERIF}; font-size:${it.fs}; line-height:1.02; color:${it.c}`}>{it.topic}</div>
+                        <div style={css`font-family:${NEWS}; font-size:13px; line-height:1.35; color:${it.subC}`}>{it.title}</div>
                       </div>
                     ))}
-                  </div>
-                  <div style={css`overflow-x:auto`}>
-                    <div style={css`position:relative; margin:0 auto; width:${mp.w}; height:${mp.h}`}>
-                      {mp.svg}
-                      {mp.items.map((it, i) => (
-                        <div key={i} style={css`position:absolute; left:${it.left}; top:${it.top}; width:260px; padding:4px 8px; border-radius:4px; background:${mp.card}; opacity:${it.op}; transform:${it.tf}; transition:opacity 500ms ease ${it.delay}, transform 600ms ease ${it.delay}`}>
-                          <div style={css`position:absolute; left:-17px; top:9px; width:14px; height:14px; border-radius:50%; background:${it.dotBg}; border:2px solid ${it.dotBorder}; box-shadow:${it.ring}`} />
-                          <div style={css`font-family:${MONO}; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:${it.metaC}`}>{it.meta}</div>
-                          <div style={css`margin:5px 0 4px; font-family:${SERIF}; font-size:${it.fs}; line-height:1.02; color:${it.c}`}>{it.topic}</div>
-                          <div style={css`font-family:${NEWS}; font-size:13px; line-height:1.35; color:${it.subC}`}>{it.title}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  </MapCanvas>
                 </div>
                 <div style={css`margin-top:40px; padding-top:20px; border-top:1px solid ${mp.rule}; display:flex; justify-content:space-between; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>
                   <span>Down the Rabbit Hole</span>

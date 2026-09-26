@@ -32,6 +32,17 @@ export interface Page {
   gallery?: { items?: { name: string; year: string; tag: string; body: string }[] };
   closing?: string;
   forks?: Partial<Record<Kind, Fork>>;
+  /** Web sources the page was grounded in (added client-side, not written by the model). */
+  sources?: Source[];
+}
+
+export interface Source {
+  title: string;
+  url: string;
+}
+export interface Research {
+  notes: string;
+  sources: Source[];
 }
 
 export interface Theme {
@@ -115,3 +126,32 @@ export async function ask(prompt: string, maxTokens: number): Promise<Page> {
   }
   throw last;
 }
+
+const NO_RESEARCH: Research = { notes: "", sources: [] };
+
+/**
+ * Looks up real sources for a topic via /api/research (Anakin). "fast" is web search only (~1s);
+ * "deep" also scrapes the Wikipedia article (~8-10s). Never throws and never exceeds `budgetMs`:
+ * a slow or failed lookup resolves to `fallback()` (default: no notes) so pages are never blocked on it.
+ * `context` (e.g. a door title) disambiguates short topics in the search.
+ */
+export function research(
+  topic: string, context: string | undefined, mode: "fast" | "deep", budgetMs: number, fallback?: () => Promise<Research>,
+): Promise<Research> {
+  let done = false;
+  const call = fetch("/api/research", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic, context, mode }),
+  })
+    .then((r) => (r.ok ? r.json() : NO_RESEARCH))
+    .catch(() => NO_RESEARCH)
+    .finally(() => (done = true)) as Promise<Research>;
+  return Promise.race([call, sleep(budgetMs).then(() => (!done && fallback ? fallback() : NO_RESEARCH))]);
+}
+
+/** Prompt block asking the model to ground the page in the research notes. Empty when there are none. */
+export const grounding = (r: Research) =>
+  r.notes
+    ? `\nSOURCE NOTES (real web research on this topic):\n"""\n${r.notes}\n"""\nGround the page in these notes: prefer their names, places, dates and numbers, and never contradict them. Do not invent statistics or quotes: a quote must appear in the notes or be well documented. You may add well-known facts the notes omit. Never mention "the notes", "sources" or research in the page itself.\n`
+    : "";
