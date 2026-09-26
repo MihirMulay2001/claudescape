@@ -55,3 +55,31 @@ input::placeholder {
     opacity: 0.2;
   }
 }
+
+/* Landing topic stream: an endless drifting row of cards. */
+@keyframes rh-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.rh-stream-track {
+  animation: rh-drift 45s linear infinite;
+  will-change: transform;
+}
+.rh-stream:hover .rh-stream-track,
+.rh-stream:focus-within .rh-stream-track {
+  animation-play-state: paused;
+}
+.rh-card {
+  transform: translateY(var(--y)) rotate(var(--tilt));
+  transition: transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 450ms ease;
+}
+.rh-card:hover,
+.rh-card:focus-visible {
+  transform: translateY(-14px) rotate(0deg) scale(1.04);
+  box-shadow: 0 40px 70px -30px oklch(0 0 0 / 0.55);
+  outline: none;
+}

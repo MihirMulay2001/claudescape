@@ -69,7 +69,27 @@ export const pal = (d: number) => PAL[Math.max(0, Math.min(d, PAL.length - 1))];
 export const HUES = [30, 75, 140, 200, 262, 320];
 export const DOOR: Record<Kind, string> = { deeper: "oklch(0.16 0.035 290)", sideways: "oklch(0.79 0.12 58)" };
 export const LOAD_MSGS = ["Pulling files from the archive", "Finding the strange parts", "Checking the dates", "Setting the type", "Building two doors"];
-export const EXAMPLES = ["sports cars", "deep-sea gigantism", "the history of salt", "brutalist libraries", "lucid dreaming"];
+export type Glyph = "car" | "jelly" | "lattice" | "slab" | "moon" | "record" | "army" | "crater" | "columns";
+export interface Example {
+  /** What gets searched when the card is picked. */
+  topic: string;
+  tag: string;
+  figure: string;
+  title: string;
+  hue: number;
+  glyph: Glyph;
+}
+export const EXAMPLES: Example[] = [
+  { topic: "sports cars", tag: "Machine · Speed", figure: "V12", title: "Sports cars", hue: 28, glyph: "car" },
+  { topic: "deep-sea gigantism", tag: "Ocean · Biology", figure: "11km", title: "Deep-sea gigantism", hue: 215, glyph: "jelly" },
+  { topic: "the history of salt", tag: "Food · Trade", figure: "NaCl", title: "The history of salt", hue: 105, glyph: "lattice" },
+  { topic: "brutalist libraries", tag: "Concrete · Books", figure: "Béton", title: "Brutalist libraries", hue: 60, glyph: "slab" },
+  { topic: "lucid dreaming", tag: "Mind · Sleep", figure: "REM", title: "Lucid dreaming", hue: 295, glyph: "moon" },
+  { topic: "the Voyager Golden Record", tag: "Space · Sound", figure: "1977", title: "The Voyager Golden Record", hue: 80, glyph: "record" },
+  { topic: "the Terracotta Army", tag: "Empire · Clay", figure: "8,000", title: "The Terracotta Army", hue: 35, glyph: "army" },
+  { topic: "the Apollo 11 landing", tag: "Space · History", figure: "1969", title: "The Apollo 11 landing", hue: 255, glyph: "crater" },
+  { topic: "the Library of Alexandria", tag: "Ancient · Knowledge", figure: "~300 BC", title: "The Library of Alexandria", hue: 350, glyph: "columns" },
+];
 
 export const pad = (n: number) => String(n).padStart(2, "0");
 export const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");

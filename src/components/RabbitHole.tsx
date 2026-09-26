@@ -3,8 +3,9 @@
 import React from "react";
 import { css, MONO, NEWS, SERIF } from "./rabbit-hole/css";
 import MapCanvas from "./rabbit-hole/MapCanvas";
+import TopicStream from "./rabbit-hole/TopicStream";
 import {
-  alpha, ask, cap, DOOR, EXAMPLES, FORK_RULES, grounding, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, research, sleep, SHAPES, TAIL,
+  alpha, ask, cap, DOOR, FORK_RULES, grounding, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, research, sleep, SHAPES, TAIL,
   type Contender, type Kind, type Page, type Source, type Theme,
 } from "./rabbit-hole/content";
 
@@ -649,14 +650,13 @@ export default class RabbitHole extends React.Component<Props, State> {
     const sinkOp = sinkOn ? Math.min(1, Math.pow(p, 1.4) * (t.dark === tn.dark ? 0.85 : 0.4)) : 0;
 
     const btnInk = hover("oklch(0.55 0.15 38)");
-    const btnEx = hover("oklch(0.2 0.02 60)", "oklch(0.965 0.012 85)");
     const btnSoft = hover(t.soft);
     const btnClimb = hover(tn.ink, tn.bg);
 
     return (
       <div style={css`min-height:100vh; background:${rootBg}; color:${t.ink}; transition:background 900ms ease, color 900ms ease`}>
         {s.screen === "landing" && (
-          <main style={css`position:relative; min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; background:oklch(0.965 0.012 85); color:oklch(0.2 0.02 60)`}>
+          <main style={css`position:relative; min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; grid-template-columns:minmax(0,1fr); overflow:hidden; background:oklch(0.965 0.012 85); color:oklch(0.2 0.02 60)`}>
             <div style={css`display:flex; justify-content:space-between; align-items:center; padding:28px 40px; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:oklch(0.45 0.02 60); opacity:${landOp}; transition:opacity 400ms ease`}>
               <span style={css`font-family:${SERIF}; font-style:italic; font-size:24px; letter-spacing:0; text-transform:none; color:oklch(0.2 0.02 60)`}>Down the Rabbit Hole</span>
               <span>Every page ends in two doors</span>
@@ -681,18 +681,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                   Fall in ↓
                 </button>
               </div>
-              <div style={css`display:flex; flex-wrap:wrap; justify-content:center; gap:10px; max-width:780px`}>
-                {EXAMPLES.map((label) => (
-                  <button
-                    key={label}
-                    onClick={() => this.start(label)}
-                    className={btnEx.className}
-                    style={{ ...css`flex:none; white-space:nowrap; border:1px solid oklch(0.2 0.02 60 / 0.2); border-radius:999px; padding:10px 18px; background:transparent; color:oklch(0.2 0.02 60); font-family:${NEWS}; font-size:18px; cursor:pointer; transition:background 200ms, color 200ms`, ...btnEx.vars }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <TopicStream onPick={(topic) => this.start(topic)} />
             </div>
             <div style={css`position:relative; height:clamp(180px,34vh,340px); pointer-events:none`}>{this.holeEl(s.falling)}</div>
           </main>
