@@ -11,10 +11,10 @@ body {
 }
 
 a {
-  color: oklch(0.55 0.15 38);
+  color: #0066ff;
 }
 a:hover {
-  color: oklch(0.45 0.15 38);
+  color: #0052cc;
 }
 
 input::placeholder {

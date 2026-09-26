@@ -1,9 +1,13 @@
 "use client";
 
 import React from "react";
+import Board, { type BoardMode } from "./rabbit-hole/Board";
 import { css, MONO, NEWS, SERIF } from "./rabbit-hole/css";
+import Landing from "./rabbit-hole/Landing";
+import { decodeJourney, HASH_PREFIX, type BoardNode } from "./rabbit-hole/share";
+import Logo from "./rabbit-hole/Logo";
 import {
-  alpha, ask, cap, DOOR, EXAMPLES, FORK_RULES, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, sleep, SHAPES, TAIL,
+  ask, cap, DOOR, FORK_RULES, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, sleep, SHAPES, TAIL,
   type Contender, type Kind, type Page, type Theme,
 } from "./rabbit-hole/content";
 
@@ -44,12 +48,11 @@ interface State {
   forkOpen: boolean;
   hover: Kind | null;
   trans: Trans | null;
-  map: { finale: boolean } | null;
-  mapDrawn: boolean;
+  board: Exclude<BoardMode, "shared"> | null;
+  shared: BoardNode[] | null;
   scrollP: number;
   ready: Record<string, "ready" | "error">;
   loadIdx: number;
-  copied: boolean;
 }
 
 interface Props {
@@ -121,8 +124,9 @@ const errMsg = (e: unknown) => String((e as Error)?.message || e);
 export default class RabbitHole extends React.Component<Props, State> {
   state: State = {
     screen: "landing", query: "", falling: false, nodes: [], revealed: 0, forkOpen: false, hover: null,
-    trans: null, map: null, mapDrawn: false, scrollP: 0, ready: {}, loadIdx: 0, copied: false,
+    trans: null, board: null, shared: null, scrollP: 0, ready: {}, loadIdx: 0,
   };
+  boardCache: { src: JourneyNode[]; out: BoardNode[] } | null = null;
   forkRef = React.createRef<HTMLElement>();
   inputRef = React.createRef<HTMLInputElement>();
   pre: Record<string, { promise: Promise<Page> }> = {};
@@ -140,6 +144,11 @@ export default class RabbitHole extends React.Component<Props, State> {
       const c = this.cur();
       if (c && c.status === "loading") this.setState((s) => ({ loadIdx: s.loadIdx + 1 }));
     }, 1600);
+    if (location.hash.startsWith(HASH_PREFIX)) {
+      decodeJourney(location.hash.slice(HASH_PREFIX.length))
+        .then((shared) => this.setState({ shared }))
+        .catch(() => history.replaceState(null, "", location.pathname + location.search));
+    }
   }
   componentWillUnmount() {
     window.removeEventListener("scroll", this.onScroll);
@@ -211,7 +220,7 @@ export default class RabbitHole extends React.Component<Props, State> {
     setTimeout(() => {
       const node: JourneyNode = { id: this.nid++, topic: topic.toLowerCase(), depth: 0, via: null, status: "loading", page: null };
       window.scrollTo(0, 0);
-      this.setState({ screen: "journey", falling: false, nodes: [node], revealed: 0, forkOpen: false, hover: null, map: null, trans: null, scrollP: 0 });
+      this.setState({ screen: "journey", falling: false, nodes: [node], revealed: 0, forkOpen: false, hover: null, board: null, trans: null, scrollP: 0 });
       this.genSplit(node, [node.topic]);
     }, 1000);
   }
@@ -223,12 +232,29 @@ export default class RabbitHole extends React.Component<Props, State> {
     this.setState({ revealed: 0 });
     this.genSplit({ ...c }, path);
   }
-  async pick(kind: Kind, e: React.MouseEvent<HTMLDivElement>) {
+  doorProps(kind: Kind, title?: string) {
+    const setHover = (hover: Kind | null) => !this.state.trans && this.setState({ hover });
+    return {
+      role: "button",
+      tabIndex: 0,
+      "aria-label": `${kind === "deeper" ? "Go deeper" : "Go sideways"}${title ? `: ${title}` : ""}`,
+      onClick: (e: React.MouseEvent<HTMLDivElement>) => this.pick(kind, e.currentTarget.getBoundingClientRect()),
+      onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        this.pick(kind, e.currentTarget.getBoundingClientRect());
+      },
+      onMouseEnter: () => setHover(kind),
+      onMouseLeave: () => setHover(null),
+      onFocus: () => setHover(kind),
+      onBlur: () => setHover(null),
+    };
+  }
+  async pick(kind: Kind, r: DOMRect) {
     if (this.state.trans) return;
     const c = this.cur();
     const f = c?.page?.forks?.[kind];
     if (!c || !f) return;
-    const r = e.currentTarget.getBoundingClientRect();
     const depth = c.depth + 1, key = c.id + ":" + kind;
     const path = this.state.nodes.map((n) => n.topic);
     if (!this.pre[key]) this.prefetch(c, path);
@@ -258,12 +284,39 @@ export default class RabbitHole extends React.Component<Props, State> {
     setTimeout(() => this.setState({ trans: null }), 650);
   }
   openMap(finale: boolean) {
-    this.setState({ map: { finale }, mapDrawn: false, copied: false });
-    setTimeout(() => this.setState({ mapDrawn: true }), 80);
+    this.setState({ board: finale ? "finale" : "journey" });
+  }
+  openDoorFromBoard(kind: Kind, el: HTMLElement) {
+    const rect = el.getBoundingClientRect();
+    this.setState({ board: null });
+    this.pick(kind, rect);
+  }
+  leaveShared() {
+    history.replaceState(null, "", location.pathname + location.search);
+    this.setState({ shared: null });
   }
   goHome() {
     window.scrollTo(0, 0);
-    this.setState({ screen: "landing", nodes: [], query: "", map: null, trans: null, revealed: 0, forkOpen: false, falling: false });
+    if (this.state.shared) this.leaveShared();
+    this.setState({ screen: "landing", nodes: [], query: "", board: null, trans: null, revealed: 0, forkOpen: false, falling: false });
+  }
+  boardNodes(): BoardNode[] {
+    const src = this.state.nodes;
+    if (this.boardCache?.src === src) return this.boardCache.out;
+    const out = src.map((n): BoardNode => ({
+      topic: n.topic,
+      title: n.page?.title || n.title || cap(n.topic),
+      kicker: n.page?.kicker,
+      dek: n.page?.dek,
+      figure: n.page?.figure?.value ? n.page.figure : undefined,
+      excerpt: n.page?.intro?.slice(0, 320),
+      layout: n.page?.layout,
+      via: n.via,
+      forks: n.page?.forks,
+      pending: n.status === "loading",
+    }));
+    this.boardCache = { src, out };
+    return out;
   }
 
   // ─── Pieces ──────────────────────────────────────────────────────────────
@@ -304,112 +357,6 @@ export default class RabbitHole extends React.Component<Props, State> {
       : [bar("100%", 0, 160, 28), bar("92%", 1, 16, 40), bar("88%", 2), bar("95%", 3), bar("60%", 4), bar("34%", 5, 36, 56), bar("90%", 6), bar("84%", 7), bar("70%", 8)];
     return <div style={{ maxWidth: 820 }}>{bars}</div>;
   }
-  holeEl(falling: boolean) {
-    const n = 9, rings = [];
-    for (let i = 0; i < n; i++) {
-      const w = 1100 - i * 110, last = i === n - 1;
-      const L = 0.92 - i * 0.09, hue = (80 - i * 16 + 360) % 360;
-      rings.push(
-        <div
-          key={i}
-          style={{
-            position: "absolute", left: "50%", top: `calc(58% + ${i * 7}px)`, width: w, height: w * 0.26, marginLeft: -w / 2, marginTop: -w * 0.13, borderRadius: "50%",
-            background: last ? "oklch(0.965 0.012 85)" : `oklch(${L.toFixed(3)} ${(0.02 + i * 0.005).toFixed(3)} ${hue})`,
-            boxShadow: last ? "0 0 60px 10px oklch(0.965 0.012 85 / 0.5)" : "none",
-          }}
-        />,
-      );
-    }
-    return (
-      <div style={{ position: "absolute", inset: 0, transformOrigin: "50% calc(58% + 56px)", transform: falling ? "scale(42)" : "scale(1)", transition: "transform 1000ms cubic-bezier(.7,0,.25,1)" }}>
-        {rings}
-      </div>
-    );
-  }
-
-  buildMap() {
-    const s = this.state, ns = s.nodes;
-    if (!ns.length || !s.map) return null;
-    const finale = s.map.finale, last = ns[ns.length - 1];
-    const lp = pal(finale ? last.depth + 1 : last.depth);
-    const U = 270, R = 138, PX = 30, PY = 20, step = finale ? 0.55 : 0.3;
-    let x = 0;
-    const pos = ns.map((n, i) => {
-      if (i > 0) x += n.via === "sideways" ? 1 : -0.6;
-      return x;
-    });
-    type Raw =
-      | { x: number; y: number; kind: "visited"; n: JourneyNode; i: number; delay: number }
-      | { x: number; y: number; kind: "ahead" | "skipped"; f: { topic: string; title: string }; k: Kind; i: number; delay: number };
-    const raw: Raw[] = [];
-    const edges: { a: [number, number]; b: [number, number]; chosen: boolean; delay: number }[] = [];
-    ns.forEach((n, i) => {
-      raw.push({ x: pos[i], y: i, kind: "visited", n, i, delay: i * step });
-      if (i > 0) edges.push({ a: [pos[i - 1], i - 1], b: [pos[i], i], chosen: true, delay: (i - 1) * step + 0.1 });
-      const forks = n.page?.forks;
-      if (!forks) return;
-      const kinds: Kind[] = i < ns.length - 1 ? [ns[i + 1].via === "deeper" ? "sideways" : "deeper"] : ["deeper", "sideways"];
-      kinds.forEach((k) => {
-        const f = forks[k];
-        if (!f) return;
-        const cx = pos[i] + (k === "sideways" ? 1 : -0.6);
-        raw.push({ x: cx, y: i + 1, kind: i === ns.length - 1 && !finale ? "ahead" : "skipped", f, k, i, delay: i * step + step * 0.9 });
-        edges.push({ a: [pos[i], i], b: [cx, i + 1], chosen: false, delay: i * step + step * 0.6 });
-      });
-    });
-    const minX = Math.min(...raw.map((r) => r.x)), maxX = Math.max(...raw.map((r) => r.x));
-    const rows = Math.max(...raw.map((r) => r.y)) + 1;
-    const px = (v: number) => PX + (v - minX) * U, py = (v: number) => PY + v * R + 16;
-    const w = PX * 2 + (maxX - minX) * U + 270, hgt = PY * 2 + (rows - 1) * R + 110;
-    const drawn = s.mapDrawn;
-    const items = raw.map((r) => {
-      const vis = r.kind === "visited", isCur = vis && r.i === ns.length - 1;
-      const via = r.kind === "visited" ? r.n.via : r.k;
-      const meta = vis ? (r.i === 0 ? "Start" : `L${pad(r.i)} · ${via}`) : `L${pad(r.i + 1)} · ${via} · ${r.kind === "ahead" ? "ahead" : "not taken"}`;
-      const final = vis ? 1 : 0.7;
-      return {
-        left: px(r.x) + 10 + "px", top: py(r.y) - 16 + "px",
-        op: drawn ? final : 0, tf: drawn ? "none" : "translateY(8px)", delay: r.delay.toFixed(2) + "s",
-        meta, topic: cap(r.kind === "visited" ? r.n.topic : r.f.topic), title: r.kind === "visited" ? r.n.page?.title || "" : r.f.title,
-        fs: vis ? "25px" : "19px", c: vis ? lp.ink : lp.muted, subC: lp.muted, metaC: vis ? lp.accent : lp.muted,
-        dotBg: vis ? (r.i === 0 ? lp.soft : lp.accent) : "transparent", dotBorder: vis ? lp.accent : lp.muted,
-        ring: isCur && !finale ? `0 0 0 7px ${alpha(lp.accent, 0.25)}` : isCur ? `0 0 0 7px ${alpha(lp.accent, 0.18)}` : "none",
-      };
-    });
-    const svg = (
-      <svg width={w} height={hgt} style={{ position: "absolute", inset: 0, overflow: "visible" }}>
-        {edges.map((e, i) => {
-          const x1 = px(e.a[0]), y1 = py(e.a[1]), x2 = px(e.b[0]), y2 = py(e.b[1]);
-          const d = `M${x1} ${y1} C${x1} ${y1 + R * 0.55} ${x2} ${y2 - R * 0.55} ${x2} ${y2}`;
-          return e.chosen ? (
-            <path key={i} d={d} fill="none" stroke={lp.accent} strokeWidth={2.5} pathLength={1} strokeDasharray={1} strokeDashoffset={drawn ? 0 : 1} style={{ transition: `stroke-dashoffset ${finale ? 0.6 : 0.4}s ease ${e.delay}s` }} />
-          ) : (
-            <path key={i} d={d} fill="none" stroke={lp.muted} strokeWidth={1.25} strokeDasharray="3 6" style={{ opacity: drawn ? 0.6 : 0, transition: `opacity .5s ease ${e.delay}s` }} />
-          );
-        })}
-      </svg>
-    );
-    const skipped = raw.filter((r) => r.kind === "skipped").length;
-    const sideways = ns.filter((n) => n.via === "sideways").length;
-    return {
-      bg: lp.bg, ink: lp.ink, muted: lp.muted, rule: lp.rule, accent: lp.accent, card: lp.soft,
-      op: drawn ? 1 : 0, finale, midway: !finale && last.depth > 0, top: !finale && last.depth === 0,
-      root: ns[0].topic, last: last.topic, levels: last.depth,
-      eyebrow: finale ? "The journey map" : "Path map · so far",
-      closeLabel: finale ? "Back to the page" : "Close map",
-      stats: [
-        { v: pad(last.depth), l: "Levels down" },
-        { v: pad(ns.length), l: "Pages read" },
-        { v: pad(sideways), l: "Sideways turns" },
-        { v: pad(skipped), l: "Doors left closed" },
-      ],
-      footer: `${ns[0].topic} → ${last.topic}`,
-      w: w + "px", h: hgt + "px", items, svg,
-      copyLabel: s.copied ? "Copied" : "Copy share text",
-      shareText: `I fell ${last.depth} levels down the rabbit hole: started at ${ns[0].topic}, ended up at ${last.topic}.`,
-    };
-  }
-
   renderBlock(b: Block, t: Theme) {
     switch (b.type) {
       case "figure":
@@ -581,65 +528,32 @@ export default class RabbitHole extends React.Component<Props, State> {
       ticks.push({ w: i === depth ? "34px" : i < depth ? "16px" : "8px", c: i === depth ? t.accent : i < depth ? t.muted : t.rule, label: pad(i), op: i === depth ? 1 : 0 });
     const crumbs = nodes.slice(-4).map((n, i, arr) => ({ label: n.topic, c: i === arr.length - 1 ? t.ink : t.muted, arrowOp: i === 0 && nodes.length <= 4 ? 0 : 1 }));
 
-    const mp = this.buildMap();
     const levelStr = pad(depth);
-    const landOp = s.falling ? 0 : 1;
     const sinkOp = sinkOn ? Math.min(1, Math.pow(p, 1.4) * (t.dark === tn.dark ? 0.85 : 0.4)) : 0;
 
-    const btnInk = hover("oklch(0.55 0.15 38)");
-    const btnEx = hover("oklch(0.2 0.02 60)", "oklch(0.965 0.012 85)");
     const btnSoft = hover(t.soft);
     const btnClimb = hover(tn.ink, tn.bg);
 
     return (
       <div style={css`min-height:100vh; background:${rootBg}; color:${t.ink}; transition:background 900ms ease, color 900ms ease`}>
         {s.screen === "landing" && (
-          <main style={css`position:relative; min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; overflow:hidden; background:oklch(0.965 0.012 85); color:oklch(0.2 0.02 60)`}>
-            <div style={css`display:flex; justify-content:space-between; align-items:center; padding:28px 40px; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:oklch(0.45 0.02 60); opacity:${landOp}; transition:opacity 400ms ease`}>
-              <span style={css`font-family:${SERIF}; font-style:italic; font-size:24px; letter-spacing:0; text-transform:none; color:oklch(0.2 0.02 60)`}>Down the Rabbit Hole</span>
-              <span>Every page ends in two doors</span>
-            </div>
-            <div style={css`display:flex; flex-direction:column; align-items:center; justify-content:center; gap:44px; padding:40px 40px 0; text-align:center; opacity:${landOp}; transform:${s.falling ? "translateY(-30px)" : "none"}; transition:opacity 500ms ease, transform 700ms ease`}>
-              <h1 style={css`margin:0; max-width:1040px; font-family:${SERIF}; font-weight:400; font-size:clamp(56px,7.6vw,124px); line-height:.94; letter-spacing:-.02em; text-wrap:balance`}>What are you curious about?</h1>
-              <div style={css`display:flex; align-items:flex-end; gap:20px; width:min(760px,100%); padding-bottom:12px; border-bottom:1.5px solid oklch(0.2 0.02 60)`}>
-                <input
-                  ref={this.inputRef}
-                  value={s.query}
-                  onChange={(e) => this.setState({ query: e.target.value })}
-                  onKeyDown={(e) => { if (e.key === "Enter") this.start(s.query); }}
-                  placeholder="sports cars"
-                  aria-label="What are you curious about?"
-                  style={css`flex:1; min-width:0; border:0; outline:0; background:transparent; padding:0; font-family:${SERIF}; font-style:italic; font-size:46px; line-height:1.1; color:oklch(0.2 0.02 60)`}
-                />
-                <button
-                  onClick={() => this.start(s.query || "sports cars")}
-                  className={btnInk.className}
-                  style={{ ...css`flex:none; border:0; border-radius:999px; padding:14px 24px; background:oklch(0.2 0.02 60); color:oklch(0.965 0.012 85); font-family:${MONO}; font-size:13px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer`, ...btnInk.vars }}
-                >
-                  Fall in ↓
-                </button>
-              </div>
-              <div style={css`display:flex; flex-wrap:wrap; justify-content:center; gap:10px; max-width:780px`}>
-                {EXAMPLES.map((label) => (
-                  <button
-                    key={label}
-                    onClick={() => this.start(label)}
-                    className={btnEx.className}
-                    style={{ ...css`flex:none; white-space:nowrap; border:1px solid oklch(0.2 0.02 60 / 0.2); border-radius:999px; padding:10px 18px; background:transparent; color:oklch(0.2 0.02 60); font-family:${NEWS}; font-size:18px; cursor:pointer; transition:background 200ms, color 200ms`, ...btnEx.vars }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={css`position:relative; height:clamp(180px,34vh,340px); pointer-events:none`}>{this.holeEl(s.falling)}</div>
-          </main>
+          <Landing
+            query={s.query}
+            onQuery={(query) => this.setState({ query })}
+            onStart={(topic) => this.start(topic)}
+            falling={s.falling}
+            hops={hops}
+            inputRef={this.inputRef}
+          />
         )}
 
         {s.screen === "journey" && (
           <>
             <div style={css`position:fixed; top:0; left:0; right:0; z-index:30; height:64px; display:flex; align-items:center; gap:24px; padding:0 28px 0 32px; background:color-mix(in oklch, ${t.bg} 86%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid ${t.rule}; transition:background 900ms ease`}>
-              <button onClick={() => this.goHome()} style={css`flex:none; border:0; background:transparent; padding:0; cursor:pointer; font-family:${SERIF}; font-style:italic; font-size:22px; color:${t.ink}`}>Down the Rabbit Hole</button>
+              <button onClick={() => this.goHome()} style={css`flex:none; display:flex; align-items:center; gap:8px; border:0; background:transparent; padding:0; cursor:pointer; font-family:${SERIF}; font-size:23px; letter-spacing:-.01em; color:${t.ink}`}>
+                <Logo style={css`width:18px; height:18px; color:${t.accent}`} />
+                claudescape
+              </button>
               <div style={css`flex:1; min-width:0; display:flex; justify-content:center; align-items:center; gap:10px; overflow:hidden; white-space:nowrap; font-family:${MONO}; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:${t.muted}`}>
                 {crumbs.map((cr, i) => (
                   <span key={i} style={css`display:flex; gap:10px; color:${cr.c}; overflow:hidden; text-overflow:ellipsis`}>
@@ -653,7 +567,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                 className={btnSoft.className}
                 style={{ ...css`flex:none; display:flex; align-items:center; gap:10px; border:1px solid ${t.rule}; border-radius:999px; padding:9px 16px; background:transparent; color:${t.ink}; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`, ...btnSoft.vars }}
               >
-                Path map<span style={css`color:${t.accent}`}>L{levelStr}</span>
+                Board<span style={css`color:${t.accent}`}>L{levelStr}</span>
               </button>
             </div>
 
@@ -727,11 +641,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                   <div style={css`max-width:1000px; margin:36px auto 0`}>{this.forkSvg(open, chosen || hv, t)}</div>
                   <div style={css`max-width:1000px; margin:0 auto; display:flex; justify-content:center`}>
                     <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => this.pick("deeper", e)}
-                      onMouseEnter={() => !s.trans && this.setState({ hover: "deeper" })}
-                      onMouseLeave={() => !s.trans && this.setState({ hover: null })}
+                      {...this.doorProps("deeper", fk.d?.title)}
                       style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 70% 55% at 50% 30%, oklch(0.07 0.02 285) 0%, oklch(0.16 0.035 290) 55%, oklch(0.23 0.05 305) 100%); color:oklch(0.95 0.015 70); box-shadow:${doorSh("deeper")}; transform:${doorTf("deeper", 1)}; opacity:${doorOp("deeper")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
                     >
                       <div style={css`position:absolute; inset:16px; border-radius:999px 999px 10px 10px; border:1px solid oklch(1 0 0 / 0.16)`} />
@@ -752,11 +662,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                     </div>
                     <div style={css`flex:none; width:160px; display:flex; align-items:center; justify-content:center; font-family:${SERIF}; font-style:italic; font-size:30px; color:${t.muted}; opacity:${fk.orOp}; transition:opacity 800ms ease 400ms`}>or</div>
                     <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => this.pick("sideways", e)}
-                      onMouseEnter={() => !s.trans && this.setState({ hover: "sideways" })}
-                      onMouseLeave={() => !s.trans && this.setState({ hover: null })}
+                      {...this.doorProps("sideways", fk.s?.title)}
                       style={css`position:relative; flex:none; width:420px; height:570px; border-radius:210px 210px 18px 18px; overflow:hidden; cursor:pointer; background:radial-gradient(ellipse 80% 60% at 72% 28%, oklch(0.9 0.08 75) 0%, oklch(0.79 0.12 58) 58%, oklch(0.71 0.13 45) 100%); color:oklch(0.2 0.04 40); box-shadow:${doorSh("sideways")}; transform:${doorTf("sideways", -1)}; opacity:${doorOp("sideways")}; transition:transform 900ms cubic-bezier(.2,.8,.2,1), opacity 700ms ease, box-shadow 400ms ease`}
                     >
                       <div style={css`position:absolute; inset:16px; border-radius:999px 999px 10px 10px; border:1px solid oklch(0.2 0.04 40 / 0.22)`} />
@@ -787,7 +693,7 @@ export default class RabbitHole extends React.Component<Props, State> {
                       </button>
                     )}
                     <button onClick={() => this.openMap(false)} style={css`border:0; background:transparent; padding:6px; color:${tn.muted}; font-family:${NEWS}; font-style:italic; font-size:18px; cursor:pointer; text-decoration:underline; text-underline-offset:4px`}>
-                      or peek at the map so far
+                      or open the journey board
                     </button>
                   </div>
                 </section>
@@ -810,63 +716,26 @@ export default class RabbitHole extends React.Component<Props, State> {
           </div>
         )}
 
-        {mp && (
-          <div style={css`position:fixed; inset:0; z-index:60; overflow:auto; background:${mp.bg}; color:${mp.ink}; opacity:${mp.op}; transition:opacity 500ms ease`}>
-            <div style={css`display:flex; justify-content:space-between; align-items:center; padding:24px 40px`}>
-              <span style={css`font-family:${SERIF}; font-style:italic; font-size:22px`}>Down the Rabbit Hole</span>
-              <button onClick={() => this.setState({ map: null })} style={css`border:1px solid ${mp.rule}; border-radius:999px; padding:9px 16px; background:transparent; color:${mp.ink}; font-family:${MONO}; font-size:11px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`}>{mp.closeLabel}</button>
-            </div>
-            <div style={css`max-width:1320px; margin:0 auto; padding:8px 40px 40px`}>
-              <div style={css`padding:56px 64px 48px; border-radius:10px; background:${mp.card}; border:1px solid ${mp.rule}`}>
-                <div style={css`font-family:${MONO}; font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:${mp.accent}`}>{mp.eyebrow}</div>
-                <h1 style={css`margin:18px 0 0; max-width:1080px; font-family:${SERIF}; font-weight:400; font-size:clamp(48px,5.6vw,92px); line-height:.98; letter-spacing:-.02em; text-wrap:balance`}>
-                  {mp.finale && (<>You started at <em style={css`color:${mp.accent}`}>{mp.root}</em> and ended up at <em style={css`color:${mp.accent}`}>{mp.last}</em>.</>)}
-                  {mp.midway && (<>You’re {mp.levels} levels below <em style={css`color:${mp.accent}`}>{mp.root}</em>, somewhere around <em style={css`color:${mp.accent}`}>{mp.last}</em>.</>)}
-                  {mp.top && (<>You’re still at the surface of <em style={css`color:${mp.accent}`}>{mp.root}</em>. Two doors wait at the bottom of the page.</>)}
-                </h1>
-                <div style={css`margin-top:48px; display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; border-top:1px solid ${mp.rule}; padding-top:40px`}>
-                  <div style={css`display:flex; flex-direction:column; gap:28px`}>
-                    {mp.stats.map((st) => (
-                      <div key={st.l}>
-                        <div style={css`font-family:${SERIF}; font-size:64px; line-height:.9`}>{st.v}</div>
-                        <div style={css`margin-top:6px; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>{st.l}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={css`overflow-x:auto`}>
-                    <div style={css`position:relative; margin:0 auto; width:${mp.w}; height:${mp.h}`}>
-                      {mp.svg}
-                      {mp.items.map((it, i) => (
-                        <div key={i} style={css`position:absolute; left:${it.left}; top:${it.top}; width:260px; padding:4px 8px; border-radius:4px; background:${mp.card}; opacity:${it.op}; transform:${it.tf}; transition:opacity 500ms ease ${it.delay}, transform 600ms ease ${it.delay}`}>
-                          <div style={css`position:absolute; left:-17px; top:9px; width:14px; height:14px; border-radius:50%; background:${it.dotBg}; border:2px solid ${it.dotBorder}; box-shadow:${it.ring}`} />
-                          <div style={css`font-family:${MONO}; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:${it.metaC}`}>{it.meta}</div>
-                          <div style={css`margin:5px 0 4px; font-family:${SERIF}; font-size:${it.fs}; line-height:1.02; color:${it.c}`}>{it.topic}</div>
-                          <div style={css`font-family:${NEWS}; font-size:13px; line-height:1.35; color:${it.subC}`}>{it.title}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div style={css`margin-top:40px; padding-top:20px; border-top:1px solid ${mp.rule}; display:flex; justify-content:space-between; font-family:${MONO}; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:${mp.muted}`}>
-                  <span>Down the Rabbit Hole</span>
-                  <span>{mp.footer}</span>
-                </div>
-              </div>
-              <div style={css`display:flex; justify-content:center; gap:12px; padding:32px 0 24px`}>
-                <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(mp.shareText).catch(() => {});
-                    this.setState({ copied: true });
-                  }}
-                  style={css`border:0; border-radius:999px; padding:14px 24px; background:${mp.ink}; color:${mp.bg}; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`}
-                >
-                  {mp.copyLabel}
-                </button>
-                <button onClick={() => this.setState({ map: null })} style={css`border:1px solid ${mp.rule}; border-radius:999px; padding:14px 24px; background:transparent; color:${mp.ink}; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`}>Keep falling</button>
-                <button onClick={() => this.goHome()} style={css`border:1px solid ${mp.rule}; border-radius:999px; padding:14px 24px; background:transparent; color:${mp.ink}; font-family:${MONO}; font-size:12px; letter-spacing:.14em; text-transform:uppercase; cursor:pointer`}>Start a new hole</button>
-              </div>
-            </div>
-          </div>
+        {s.board && s.screen === "journey" && (
+          <Board
+            nodes={this.boardNodes()}
+            mode={s.board}
+            onClose={() => this.setState({ board: null })}
+            onNewHole={() => this.goHome()}
+            onOpenDoor={(kind, el) => this.openDoorFromBoard(kind, el)}
+          />
+        )}
+
+        {s.shared && (
+          <Board
+            nodes={s.shared}
+            mode="shared"
+            onNewHole={() => this.leaveShared()}
+            onStartAt={(topic) => {
+              this.leaveShared();
+              this.start(topic);
+            }}
+          />
         )}
       </div>
     );

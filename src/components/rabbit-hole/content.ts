@@ -45,8 +45,8 @@ export interface Theme {
 }
 
 export const PAL: Theme[] = [
-  { bg: "oklch(0.965 0.012 85)", ink: "oklch(0.2 0.02 60)", muted: "oklch(0.45 0.02 60)", rule: "oklch(0.2 0.02 60 / 0.14)", accent: "oklch(0.55 0.15 38)", soft: "oklch(0.925 0.018 80)", dark: false },
-  { bg: "oklch(0.885 0.032 70)", ink: "oklch(0.2 0.03 50)", muted: "oklch(0.4 0.035 50)", rule: "oklch(0.2 0.03 50 / 0.16)", accent: "oklch(0.5 0.15 36)", soft: "oklch(0.845 0.04 68)", dark: false },
+  { bg: "oklch(0.965 0.012 85)", ink: "oklch(0.2 0.02 60)", muted: "oklch(0.45 0.02 60)", rule: "oklch(0.2 0.02 60 / 0.14)", accent: "oklch(0.52 0.2 262)", soft: "oklch(0.925 0.018 80)", dark: false },
+  { bg: "oklch(0.885 0.032 70)", ink: "oklch(0.2 0.03 50)", muted: "oklch(0.4 0.035 50)", rule: "oklch(0.2 0.03 50 / 0.16)", accent: "oklch(0.48 0.19 262)", soft: "oklch(0.845 0.04 68)", dark: false },
   { bg: "oklch(0.3 0.05 36)", ink: "oklch(0.95 0.02 75)", muted: "oklch(0.8 0.035 60)", rule: "oklch(0.95 0.02 75 / 0.16)", accent: "oklch(0.8 0.12 58)", soft: "oklch(0.35 0.055 36)", dark: true },
   { bg: "oklch(0.23 0.045 340)", ink: "oklch(0.94 0.02 50)", muted: "oklch(0.78 0.035 340)", rule: "oklch(0.94 0.02 50 / 0.15)", accent: "oklch(0.8 0.12 58)", soft: "oklch(0.28 0.05 340)", dark: true },
   { bg: "oklch(0.18 0.04 285)", ink: "oklch(0.93 0.015 280)", muted: "oklch(0.76 0.035 285)", rule: "oklch(0.93 0.015 280 / 0.15)", accent: "oklch(0.8 0.12 58)", soft: "oklch(0.225 0.045 285)", dark: true },
