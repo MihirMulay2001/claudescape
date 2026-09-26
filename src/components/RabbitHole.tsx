@@ -5,7 +5,7 @@ import Board, { type BoardMode } from "./rabbit-hole/Board";
 import { css, MONO, NEWS, SERIF } from "./rabbit-hole/css";
 import Landing from "./rabbit-hole/Landing";
 import { decodeJourney, HASH_PREFIX, type BoardNode } from "./rabbit-hole/share";
-import Spark from "./rabbit-hole/Spark";
+import Logo from "./rabbit-hole/Logo";
 import {
   ask, cap, DOOR, FORK_RULES, HEAD, HUES, LAYOUTS, layoutRule, LOAD_MSGS, pad, pal, sleep, SHAPES, TAIL,
   type Contender, type Kind, type Page, type Theme,
@@ -551,7 +551,7 @@ export default class RabbitHole extends React.Component<Props, State> {
           <>
             <div style={css`position:fixed; top:0; left:0; right:0; z-index:30; height:64px; display:flex; align-items:center; gap:24px; padding:0 28px 0 32px; background:color-mix(in oklch, ${t.bg} 86%, transparent); backdrop-filter:blur(12px); border-bottom:1px solid ${t.rule}; transition:background 900ms ease`}>
               <button onClick={() => this.goHome()} style={css`flex:none; display:flex; align-items:center; gap:8px; border:0; background:transparent; padding:0; cursor:pointer; font-family:${SERIF}; font-size:23px; letter-spacing:-.01em; color:${t.ink}`}>
-                <Spark style={css`width:18px; height:18px; color:${t.accent}`} />
+                <Logo style={css`width:18px; height:18px; color:${t.accent}`} />
                 claudescape
               </button>
               <div style={css`flex:1; min-width:0; display:flex; justify-content:center; align-items:center; gap:10px; overflow:hidden; white-space:nowrap; font-family:${MONO}; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:${t.muted}`}>

@@ -8,8 +8,8 @@
   --ink: #f5f4ee;
   --muted: #b0aea5;
   --faint: #7d7b73;
-  --accent: #d97757;
-  --accent2: #c6613f;
+  --accent: #4d94ff;
+  --accent2: #2f7bff;
   --shadow: rgb(0 0 0 / 0.5);
 
   position: fixed;
@@ -31,6 +31,8 @@
   --ink: #141413;
   --muted: #5e5d59;
   --faint: #9a988f;
+  --accent: #0066ff;
+  --accent2: #0052cc;
   --shadow: rgb(60 40 20 / 0.16);
 }
 @keyframes boardIn {
@@ -449,7 +451,7 @@
   font-size: 22px;
   cursor: pointer;
 }
-.miniSpark {
+.logo {
   width: 18px;
   height: 18px;
   color: var(--accent);

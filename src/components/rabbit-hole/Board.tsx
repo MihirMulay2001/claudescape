@@ -5,7 +5,7 @@ import styles from "./board.module.css";
 import { cap, pad, pal, type Kind } from "./content";
 import type { BoardFork, BoardNode } from "./share";
 import ShareSheet from "./ShareSheet";
-import Spark from "./Spark";
+import Logo from "./Logo";
 import { THEME_KEY, useTheme, writeStore } from "./store";
 
 export type BoardMode = "journey" | "finale" | "shared";
@@ -464,7 +464,7 @@ export default function Board({ nodes, mode, onClose, onNewHole, onOpenDoor, onS
             </button>
           )}
           <button className={styles.wordmark} onClick={mode === "shared" ? onNewHole : undefined} tabIndex={mode === "shared" ? 0 : -1}>
-            <Spark className={styles.miniSpark} />
+            <Logo className={styles.logo} />
             claudescape
           </button>
         </div>

@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { EXAMPLES, pal } from "./content";
+import { EXAMPLES } from "./content";
 import styles from "./landing.module.css";
-import Spark from "./Spark";
+import Logo from "./Logo";
 import { RECENT_KEY, THEME_KEY, useStored, useTheme, writeStore } from "./store";
 
 interface Props {
@@ -48,7 +48,6 @@ const PROMPTS = [
   "What makes a supercar fast?",
 ];
 
-const RINGS = Array.from({ length: 8 }, (_, i) => i);
 const MOTES = Array.from({ length: 26 }, (_, i) => ({
   left: (i * 37 + 11) % 100,
   size: 2 + ((i * 7) % 4),
@@ -233,7 +232,6 @@ function MotifArt({ motif }: { motif: Motif }) {
 
 export default function Landing({ query, onQuery, onStart, falling, hops, inputRef }: Props) {
   const rootRef = useRef<HTMLElement>(null);
-  const bumpRef = useRef<HTMLSpanElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const raf = useRef(0);
@@ -262,15 +260,6 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
     [falling, recent, onStart],
   );
 
-  const bump = (big = false) => {
-    bumpRef.current?.animate(
-      big
-        ? [{ transform: "rotate(0deg) scale(1)" }, { transform: "rotate(200deg) scale(1.25)" }, { transform: "rotate(360deg) scale(1)" }]
-        : [{ transform: "scale(1)" }, { transform: "scale(1.14) rotate(10deg)" }, { transform: "scale(1)" }],
-      { duration: big ? 900 : 360, easing: "cubic-bezier(.3,1.2,.4,1)" },
-    );
-  };
-
   const surprise = () => {
     if (rolling || falling) return;
     setRolling(true);
@@ -280,7 +269,6 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
     const tick = () => {
       n++;
       onQuery(pick());
-      bump();
       if (n < 14) {
         rollTimer.current = setTimeout(tick, 40 + n * 14);
         return;
@@ -300,8 +288,6 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
     raf.current = requestAnimationFrame(() => {
       el.style.setProperty("--gx", `${x}px`);
       el.style.setProperty("--gy", `${y}px`);
-      el.style.setProperty("--mx", ((x / innerWidth - 0.5) * 2).toFixed(3));
-      el.style.setProperty("--my", ((y / innerHeight - 0.5) * 2).toFixed(3));
     });
   };
 
@@ -357,7 +343,6 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
     inputRef.current?.focus({ preventScroll: true });
   };
 
-  const cream = pal(0).bg;
   const deck = [...CARDS, ...CARDS];
   const rootCls = [styles.root, falling && styles.falling, (focused || !!query) && styles.active].filter(Boolean).join(" ");
 
@@ -380,10 +365,10 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
           <button ref={menuBtnRef} className={styles.iconBtn} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer} aria-controls="cs-drawer">
             <span className={styles.burger}><span /><span /><span /></span>
           </button>
-          <button className={styles.wordmark} onClick={() => bump(true)}>
-            <Spark className={styles.miniSpark} />
+          <span className={styles.wordmark}>
+            <Logo className={styles.logo} />
             claudescape
-          </button>
+          </span>
         </div>
         <div className={styles.greeting}>
           {greeting}, <em>curious one</em>
@@ -414,31 +399,6 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
       </header>
 
       <section className={styles.hero}>
-        <div className={styles.sparkStage}>
-          <div className={styles.hole} aria-hidden>
-            {RINGS.map((i) => (
-              <div
-                key={i}
-                className={styles.ring}
-                style={vars({
-                  "--i": i,
-                  "--s": `${1100 - i * 130}px`,
-                  "--d": `${i * 5}px`,
-                  "--fill": `${1 + i * 0.8}%`,
-                  "--edge": `${5 + i * 1.5}%`,
-                  "--fall": i === RINGS.length - 1 ? cream : `color-mix(in oklch, var(--accent2), ${cream} ${14 + i * 12}%)`,
-                })}
-              />
-            ))}
-            <div className={styles.orbit} />
-          </div>
-          <button className={styles.sparkWrap} onClick={() => bump(true)} aria-label="Spin the spark" tabIndex={-1}>
-            <span ref={bumpRef} className={styles.sparkBump}>
-              <Spark className={styles.spark} />
-            </span>
-          </button>
-        </div>
-
         <div className={styles.heroText}>
           <h1 className={styles.title}>
             <span className={styles.word} style={vars({ "--i": 0 })}>Start</span>{" "}
@@ -461,7 +421,6 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
                   value={query}
                   onChange={(e) => {
                     onQuery(e.target.value);
-                    bump();
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.nativeEvent.isComposing) go(query || tw.full);
@@ -486,7 +445,7 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
               </div>
               <div className={styles.composerFoot}>
                 <span className={styles.footLeft}>
-                  <Spark className={styles.miniSpark} />
+                  <Logo className={styles.logo} />
                   Written live by Claude
                 </span>
                 <span className={styles.footRight}>
@@ -564,7 +523,7 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
       <aside id="cs-drawer" className={`${styles.drawer} ${drawer ? styles.drawerOpen : ""}`} inert={!drawer} aria-label="Menu">
         <div className={styles.drawerHead}>
           <span className={styles.wordmark}>
-            <Spark className={styles.miniSpark} />
+            <Logo className={styles.logo} />
             claudescape
           </span>
           <button ref={closeBtnRef} className={styles.iconBtn} onClick={() => closeDrawer(true)} aria-label="Close menu">
@@ -618,7 +577,7 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
         </div>
 
         <div className={styles.drawerFoot}>
-          <Spark className={styles.miniSpark} />
+          <Logo className={styles.logo} />
           Powered by Claude
         </div>
       </aside>

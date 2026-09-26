@@ -1,5 +1,5 @@
 .root {
-  --bg: #262624;
+  --bg: #262626;
   --surface: #30302e;
   --surface2: #3a3936;
   --line: rgb(222 220 209 / 0.1);
@@ -7,9 +7,9 @@
   --ink: #f5f4ee;
   --muted: #b0aea5;
   --faint: #7d7b73;
-  --accent: #d97757;
-  --accent2: #c6613f;
-  --glow: rgb(217 119 87 / 0.16);
+  --accent: #4d94ff;
+  --accent2: #2f7bff;
+  --glow: rgb(77 148 255 / 0.14);
   --shadow: rgb(0 0 0 / 0.55);
 
   position: relative;
@@ -34,9 +34,9 @@
   --ink: #141413;
   --muted: #5e5d59;
   --faint: #9a988f;
-  --accent: #d97757;
-  --accent2: #c15f3c;
-  --glow: rgb(217 119 87 / 0.14);
+  --accent: #0066ff;
+  --accent2: #0052cc;
+  --glow: rgb(0 102 255 / 0.1);
   --shadow: rgb(60 40 20 / 0.22);
 }
 .falling {
@@ -44,7 +44,7 @@
   transition: background-color 500ms ease 450ms;
 }
 
-/* ─── Ambient layers ─────────────────────────────────────────────────── */
+/* â”€â”€â”€ Ambient layers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .backdrop {
   position: absolute;
@@ -117,7 +117,7 @@
   }
 }
 
-/* ─── Header ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .header {
   position: relative;
@@ -205,15 +205,8 @@
   font-family: var(--font-instrument), serif;
   font-size: 23px;
   letter-spacing: -0.01em;
-  cursor: pointer;
 }
-.wordmark svg {
-  transition: transform 700ms cubic-bezier(0.3, 1.4, 0.4, 1);
-}
-.wordmark:hover svg {
-  transform: rotate(180deg);
-}
-.miniSpark {
+.logo {
   width: 18px;
   height: 18px;
   color: var(--accent);
@@ -294,7 +287,7 @@
   transform: rotate(90deg) scale(0.4);
 }
 
-/* ─── Hero ───────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Hero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .hero {
   position: relative;
@@ -306,155 +299,6 @@
   gap: 26px;
   padding: 8px 24px 20px;
   text-align: center;
-}
-.sparkStage {
-  position: relative;
-  width: 84px;
-  height: 84px;
-}
-.hole {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 1200px;
-  height: 1200px;
-  margin: -600px 0 0 -600px;
-  pointer-events: none;
-  -webkit-mask-image: radial-gradient(closest-side, #000 30%, transparent 100%);
-  mask-image: radial-gradient(closest-side, #000 30%, transparent 100%);
-  transition: transform 1000ms cubic-bezier(0.7, 0, 0.25, 1);
-}
-.falling .hole {
-  transform: scale(40);
-}
-.ring {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--s);
-  height: var(--s);
-  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
-  border: 1px solid color-mix(in oklch, var(--ink) var(--edge), transparent);
-  border-radius: 50%;
-  background: color-mix(in oklch, var(--accent) var(--fill), transparent);
-  transform: translate(calc(var(--mx, 0) * var(--d)), calc(var(--my, 0) * var(--d)));
-  transition: transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 500ms ease, border-color 500ms ease;
-  animation: ringBreath 6s ease-in-out infinite;
-  animation-delay: calc(var(--i) * -0.4s);
-}
-@keyframes ringBreath {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-.falling .ring {
-  background: var(--fall);
-  border-color: transparent;
-  transform: none;
-  animation: none;
-  opacity: 1;
-}
-.orbit {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 220px;
-  height: 220px;
-  margin: -110px 0 0 -110px;
-  border: 1px dashed color-mix(in oklch, var(--ink) 12%, transparent);
-  border-radius: 50%;
-  animation: spin 16s linear infinite;
-  transition: opacity 300ms;
-}
-.orbit::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: -4px;
-  width: 8px;
-  height: 8px;
-  margin-left: -4px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px 2px color-mix(in oklch, var(--accent) 70%, transparent);
-}
-.falling .orbit {
-  opacity: 0;
-}
-.sparkWrap {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-  animation: hop 7s cubic-bezier(0.3, 0, 0.3, 1) 2.5s infinite;
-}
-@keyframes hop {
-  0%,
-  84%,
-  100% {
-    translate: 0 0;
-  }
-  88% {
-    translate: 0 -22px;
-  }
-  92% {
-    translate: 0 0;
-  }
-  95% {
-    translate: 0 -7px;
-  }
-  98% {
-    translate: 0 0;
-  }
-}
-.sparkBump {
-  display: block;
-  width: 100%;
-  height: 100%;
-  transition: transform 900ms cubic-bezier(0.6, 0, 0.4, 1) 100ms;
-}
-.falling .sparkBump {
-  transform: rotate(540deg) scale(0);
-}
-.spark {
-  display: block;
-  width: 100%;
-  height: 100%;
-  color: var(--accent);
-  overflow: visible;
-  filter: drop-shadow(0 0 18px color-mix(in oklch, var(--accent) 45%, transparent));
-  animation: spin 60s linear infinite;
-  transition: filter 300ms;
-}
-.spark path {
-  transform-box: view-box;
-  transform-origin: 50% 50%;
-  animation: breathe 2.8s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.2333s);
-}
-.active .spark {
-  filter: drop-shadow(0 0 28px color-mix(in oklch, var(--accent) 75%, transparent));
-}
-.active .spark path {
-  animation-duration: 1.4s;
-  animation-delay: calc(var(--i) * 0.1167s);
-}
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(0.84);
-  }
 }
 @keyframes spin {
   to {
@@ -534,7 +378,7 @@
   animation: wordIn 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 550ms backwards;
 }
 
-/* ─── Composer ───────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Composer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .composerRing {
   position: relative;
@@ -684,7 +528,7 @@
   color: var(--muted);
 }
 
-/* ─── Chips ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .chips {
   display: flex;
@@ -737,7 +581,7 @@
   animation: spin 400ms linear infinite;
 }
 
-/* ─── Card strip ─────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Card strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .stripLabel {
   position: relative;
@@ -932,7 +776,7 @@
   opacity: 1;
 }
 
-/* ─── Drawer ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .scrim {
   position: fixed;
@@ -1124,7 +968,7 @@
   color: var(--faint);
 }
 
-/* ─── Responsive & motion ────────────────────────────────────────────── */
+/* â”€â”€â”€ Responsive & motion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 @media (max-width: 900px) {
   .greeting {

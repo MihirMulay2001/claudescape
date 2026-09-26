@@ -1,6 +1,6 @@
 import { cap } from "./content";
 import type { BoardNode } from "./share";
-import { SPARK_RAYS } from "./Spark";
+import { LOGO } from "./Logo";
 
 export type ImageFormat = "post" | "story" | "wide";
 
@@ -16,7 +16,7 @@ const C = {
   muted: "#a6a39a",
   faint: "#6f6d66",
   line: "rgba(245,244,238,0.14)",
-  accent: "#d97757",
+  accent: "#4d94ff",
 };
 
 interface Fonts {
@@ -55,17 +55,16 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number, maxLine
   return kept;
 }
 
-function drawSpark(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string) {
+function drawLogo(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(size / 100, size / 100);
+  ctx.translate(x, y);
+  ctx.scale(size / 32, size / 32);
+  ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  for (const ray of SPARK_RAYS) {
-    ctx.save();
-    ctx.rotate((ray.angle * Math.PI) / 180);
-    ctx.fill(new Path2D(ray.d));
-    ctx.restore();
-  }
+  ctx.lineWidth = LOGO.stroke;
+  ctx.lineCap = "round";
+  ctx.stroke(new Path2D(LOGO.outerDoor));
+  ctx.fill(new Path2D(LOGO.innerDoor));
   ctx.restore();
 }
 
@@ -97,24 +96,14 @@ export async function renderShareImage(nodes: BoardNode[], format: ImageFormat):
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, w, h);
   const glow = ctx.createRadialGradient(w / 2, h * 1.08, 0, w / 2, h * 1.08, Math.max(w, h) * 0.75);
-  glow.addColorStop(0, "rgba(217,119,87,0.38)");
-  glow.addColorStop(1, "rgba(217,119,87,0)");
+  glow.addColorStop(0, "rgba(77,148,255,0.3)");
+  glow.addColorStop(1, "rgba(77,148,255,0)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, w, h);
-  const ringX = w - pad * 1.2, ringY = pad * 1.4;
-  ctx.lineWidth = 1.5;
-  for (let r = 60; r < Math.max(w, h) * 0.6; r += 56) {
-    ctx.strokeStyle = `rgba(245,244,238,${Math.max(0, 0.08 - r / 12000)})`;
-    ctx.beginPath();
-    ctx.arc(ringX, ringY, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  drawSpark(ctx, ringX, ringY, 70, C.accent);
-
   // Left column (or full width): brand, headline, footer.
   const colW = wide ? 620 : w - pad * 2;
   ctx.textBaseline = "alphabetic";
-  drawSpark(ctx, pad + 20, pad + 20, 40, C.accent);
+  drawLogo(ctx, pad, pad, 40, C.accent);
   ctx.fillStyle = C.ink;
   ctx.font = `44px ${f.serif}`;
   spacing(ctx, 0);
@@ -214,7 +203,7 @@ export async function renderShareImage(nodes: BoardNode[], format: ImageFormat):
       if (isLast) {
         ctx.beginPath();
         ctx.arc(dotX, top + 14, 22, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(217,119,87,0.35)";
+        ctx.strokeStyle = "rgba(77,148,255,0.35)";
         ctx.lineWidth = 3;
         ctx.stroke();
       }
@@ -236,7 +225,7 @@ export async function renderShareImage(nodes: BoardNode[], format: ImageFormat):
     });
   });
 
-  ctx.strokeStyle = "rgba(217,119,87,0.55)";
+  ctx.strokeStyle = "rgba(77,148,255,0.55)";
   ctx.lineWidth = 3;
   for (let i = 1; i < centers.length; i++) {
     const gap = rows[i].kind === "gap" || rows[i - 1].kind === "gap";
