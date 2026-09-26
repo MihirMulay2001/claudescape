@@ -362,23 +362,19 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
 
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <button ref={menuBtnRef} className={styles.iconBtn} onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer} aria-controls="cs-drawer">
+          <button ref={menuBtnRef} className={styles.menuBtn} onClick={() => setDrawer(true)} aria-expanded={drawer} aria-controls="cs-drawer">
             <span className={styles.burger}><span /><span /><span /></span>
+            menu
           </button>
-          <span className={styles.wordmark}>
-            <Logo className={styles.logo} />
-            claudescape
-          </span>
         </div>
-        <div className={styles.greeting}>
-          {greeting}, <em>curious one</em>
-        </div>
+        <span className={styles.wordmark}>
+          <Logo className={styles.logo} />
+          claudescape
+        </span>
         <div className={styles.headerRight}>
-          <span className={styles.pill} title={`Claude writes a fresh page at every level. After ${hops} levels you can stop and see your map.`}>
-            <span className={styles.pillDot} />
-            <span>
-              {hops}<span className={styles.pillText}> levels to fall</span>
-            </span>
+          <span className={styles.depth} title={`A fresh page is written at every level. After ${hops} levels you can stop and see your map.`}>
+            <span className={styles.steps} aria-hidden><i /><i /><i /></span>
+            <span className={styles.depthText}>{hops} levels down</span>
           </span>
           <button
             className={`${styles.iconBtn} ${styles.themeBtn}`}
@@ -400,6 +396,7 @@ export default function Landing({ query, onQuery, onStart, falling, hops, inputR
 
       <section className={styles.hero}>
         <div className={styles.heroText}>
+          <p className={styles.greeting}>{greeting}, curious one.</p>
           <h1 className={styles.title}>
             <span className={styles.word} style={vars({ "--i": 0 })}>Start</span>{" "}
             <span className={styles.word} style={vars({ "--i": 1 })}>your</span>{" "}
